@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { Building } from '../types';
+import { quests as allQuests } from '../data/quests';
 
 const barNpcs: Record<string, { name: string; dialogs: string[] }[]> = {
   radom_bar: [
@@ -310,7 +311,11 @@ const BuildingScreen: React.FC = () => {
     storage,
     storyFlags,
     inventory,
-    openCrafting
+    setInventory,
+    setStoryFlags,
+    openCrafting,
+    addQuest,
+    quests
   } = useGameStore();
 
   const [selectedNpc, setSelectedNpc] = useState<number | null>(null);
@@ -378,13 +383,77 @@ const BuildingScreen: React.FC = () => {
     setShowContent('dialog');
   };
 
+  const [showQuestAccept, setShowQuestAccept] = useState<string | null>(null);
+
   const handleNextDialog = () => {
     const npcs = barNpcs[building.id] || houseNpcs[building.id] || [];
     if (selectedNpc === null) return;
     const npc = npcs[selectedNpc];
+    
+    // 检查对话是否到最后，然后显示任务接取选项
+    if (npcDialog === npc.dialogs.length - 1) {
+      // 酒吧老板：主线任务 - 寻找战车
+      if ((building.type === 'bar' || building.id === 'radom_bar') && npc.name === '酒吧老板') {
+        // 检查是否满足前置条件（完成 main_1_1 或者没有在进行中的寻找战车任务）
+        const main1 = quests.inProgress.find(q => q.id === 'main_1');
+        const hasMain1_1Completed = main1?.objectives.some(o => o.id === 'main_1_1' && o.completed);
+        const hasMain2 = quests.inProgress.some(q => q.id === 'main_2');
+        const hasCompletedMain2 = quests.completed.some(q => q.id === 'main_2');
+        
+        if ((!main1 || hasMain1_1Completed) && !hasMain2 && !hasCompletedMain2) {
+          setShowQuestAccept('main_2');
+          return;
+        }
+      }
+      
+      // 勇士中心：主线任务 - 消灭水怪
+      if (building.type === 'office' || building.id === 'radom_office') {
+        const hasMain1 = quests.completed.some(q => q.id === 'main_1');
+        const hasMain3 = quests.inProgress.some(q => q.id === 'main_3');
+        const hasCompletedMain3 = quests.completed.some(q => q.id === 'main_3');
+        
+        if (hasMain1 && !hasMain3 && !hasCompletedMain3) {
+          setShowQuestAccept('main_3');
+          return;
+        }
+        
+        // 主线任务 - 成为无畏勇士
+        const hasMain4 = quests.completed.some(q => q.id === 'main_4');
+        const hasMain5 = quests.inProgress.some(q => q.id === 'main_5');
+        const hasCompletedMain5 = quests.completed.some(q => q.id === 'main_5');
+        
+        if (hasMain4 && !hasMain5 && !hasCompletedMain5) {
+          setShowQuestAccept('main_5');
+          return;
+        }
+      }
+      
+      setShowContent('main');
+      setSelectedNpc(null);
+      return;
+    }
+    
     if (npcDialog < npc.dialogs.length - 1) {
       setNpcDialog(npcDialog + 1);
     }
+  };
+
+  const handleAcceptQuest = (questId: string) => {
+    addQuest(questId);
+    const quest = allQuests.find(q => q.id === questId);
+    if (quest) {
+      addMessage(`📜 接取任务：${quest.name}！`);
+    }
+    setShowQuestAccept(null);
+    setShowContent('main');
+    setSelectedNpc(null);
+  };
+
+  const handleRejectQuest = () => {
+    addMessage('你决定暂时不接这个任务。');
+    setShowQuestAccept(null);
+    setShowContent('main');
+    setSelectedNpc(null);
   };
 
   const handlePrevDialog = () => {
@@ -445,12 +514,12 @@ const BuildingScreen: React.FC = () => {
       }
       case 'house':
         if (building.id === 'radom_house2') {
-          healPlayer();
+          rest();
           addMessage('🏠 姐姐："弟弟回来啦！快休息一下吧。"（HP已恢复！）');
         }
         break;
       case 'home':
-        healPlayer();
+        rest();
         addMessage('🏠 回到家中，你安心地休息了一会儿。（HP已恢复！）');
         break;
       case 'warehouse':
@@ -928,12 +997,75 @@ const BuildingScreen: React.FC = () => {
     );
   };
 
+  const [showFatherDialog, setShowFatherDialog] = useState(false);
+  const [fatherDialogStep, setFatherDialogStep] = useState(0);
+
+  const fatherDialogs = [
+    '"哼...你还知道回来？"',
+    '"我听说你在外面闯出了一点名堂，不过别以为这样就了不起了。"',
+    '"这个世界比你想象的还要残酷，你还差得远呢。"',
+    '"...不过，既然你选择了这条路，就好好走下去吧。"',
+    '"家里永远是你的后盾。需要钱的话...桌上有一些，拿去用吧。"',
+    '"但是记住，别给我丢脸！"'
+  ];
+
+  const handleFatherDialog = () => {
+    if (fatherDialogStep < fatherDialogs.length - 1) {
+      setFatherDialogStep(fatherDialogStep + 1);
+    } else {
+      setShowFatherDialog(false);
+      setFatherDialogStep(0);
+      // 给玩家一些金币
+      if (player.gold < 100) {
+        addMessage('👤 父亲："拿去，这是给你的零花钱。"');
+        // 增加金币逻辑可以在这里添加
+      }
+    }
+  };
+
   const renderHomeContent = () => {
+    if (showFatherDialog) {
+      return (
+        <div className="space-y-3">
+          <div className="text-center mb-4">
+            <p className="text-amber-300 text-sm font-bold">🏠 {building.name}</p>
+          </div>
+          <div className="bg-amber-800/60 rounded-lg p-4">
+            <p className="text-amber-300 text-sm font-bold mb-2">👤 父亲</p>
+            <p className="text-amber-200/90 text-sm leading-relaxed mb-4">
+              {fatherDialogs[fatherDialogStep]}
+            </p>
+            <button
+              onClick={handleFatherDialog}
+              className="w-full py-2 bg-amber-700 hover:bg-amber-600 text-white rounded-lg text-sm font-bold transition-all"
+            >
+              {fatherDialogStep < fatherDialogs.length - 1 ? '继续' : '离开'}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-3">
         <div className="text-center mb-4">
           <p className="text-amber-300 text-sm font-bold">🏠 {building.name}</p>
           <p className="text-amber-400/70 text-xs mt-1">熟悉的房间，充满了温馨的回忆</p>
+        </div>
+        <div className="bg-amber-800/40 rounded-lg p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 rounded-full bg-amber-900 flex items-center justify-center text-2xl">👨</div>
+            <div className="flex-1">
+              <p className="text-amber-300 text-sm font-bold">👤 父亲</p>
+              <p className="text-amber-200/70 text-xs">"又是你...有什么事？"</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowFatherDialog(true)}
+            className="w-full py-2 bg-amber-700/60 hover:bg-amber-600/60 text-white rounded-lg text-sm font-medium transition-all"
+          >
+            💬 和父亲交谈
+          </button>
         </div>
         <div className="bg-amber-800/40 rounded-lg p-4 text-center">
           <p className="text-amber-300 text-sm mb-1">家</p>
@@ -941,7 +1073,7 @@ const BuildingScreen: React.FC = () => {
           <div className="flex justify-center gap-2">
             <button
               onClick={() => {
-                healPlayer();
+                rest();
                 addMessage('🏠 在家中休息了一会儿，HP恢复了！');
               }}
               className="px-6 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold text-sm transition-all"
@@ -1001,7 +1133,7 @@ const BuildingScreen: React.FC = () => {
             <div className="flex justify-center gap-2">
               <button
                 onClick={() => {
-                  healPlayer();
+                  rest();
                   setHouseAction('rested');
                   addMessage('🏠 在姐姐家休息了一晚，全体HP完全恢复了！');
                 }}
@@ -1010,7 +1142,28 @@ const BuildingScreen: React.FC = () => {
                 💤 休息（免费）
               </button>
               <button
-                onClick={() => addMessage('👤 姐姐："外面的世界很危险，你一定要多加小心..."')}
+                onClick={() => {
+                  addMessage('👤 姐姐："外面的世界很危险，你一定要多加小心..."');
+                  addMessage('👤 姐姐："这些是姐姐为你准备的补给，带上吧。"');
+                  // 如果姐姐还没有给过东西，给一些物品
+                  if (!storyFlags['sister_gave_items']) {
+                    // 给一些参丸和其他补给
+                    const existingPills = inventory.find(i => i.item.id === 'i1');
+                    if (existingPills) {
+                      const newInventory = inventory.map(i => 
+                        i.item.id === 'i1' ? { ...i, quantity: i.quantity + 2 } : i
+                      );
+                      setInventory(newInventory);
+                    } else {
+                      const pill = items.find(i => i.id === 'i1');
+                      if (pill) {
+                        setInventory([...inventory, { item: pill, quantity: 2 }]);
+                      }
+                    }
+                    setStoryFlags({ ...storyFlags, 'sister_gave_items': true });
+                    addMessage('✨ 姐姐给了你 2 个参丸！');
+                  }
+                }}
                 className="px-4 py-2 bg-teal-700/60 hover:bg-teal-600/60 text-white rounded-lg text-sm transition-all"
               >
                 💬 聊一聊
@@ -1083,6 +1236,75 @@ const BuildingScreen: React.FC = () => {
     const npc = npcs[selectedNpc];
     if (!npc) return null;
 
+    // 显示任务接取界面
+    if (showQuestAccept) {
+      const quest = allQuests.find(q => q.id === showQuestAccept);
+      if (!quest) return null;
+      
+      return (
+        <div className="space-y-4">
+          <div className="bg-gray-800/80 rounded-lg p-4 min-h-[120px]">
+            <p className="text-yellow-400 font-bold text-sm mb-2">👤 {npc.name}</p>
+            <p className="text-gray-200 text-sm leading-relaxed">
+              {npc.dialogs[npcDialog]}
+            </p>
+          </div>
+          <div className="bg-amber-900/60 rounded-lg p-4 border border-amber-600">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">📜</span>
+              <h3 className="text-amber-300 font-bold text-base">{quest.name}</h3>
+              {quest.type === 'main' && (
+                <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded font-bold">
+                  主线
+                </span>
+              )}
+            </div>
+            <p className="text-amber-200/80 text-sm mb-3">{quest.description}</p>
+            {quest.dialogueStart && (
+              <p className="text-amber-300/70 text-xs italic mb-3">
+                "{quest.dialogueStart}"
+              </p>
+            )}
+            <div className="bg-gray-800/60 rounded p-3 mb-3">
+              <p className="text-gray-400 text-xs font-semibold mb-2">🎯 任务目标：</p>
+              {quest.objectives.map((obj, idx) => (
+                <p key={idx} className="text-gray-300 text-xs mb-1">
+                  {idx + 1}. {obj.description}
+                </p>
+              ))}
+            </div>
+            {quest.rewards && (
+              <div className="bg-gray-800/60 rounded p-3">
+                <p className="text-gray-400 text-xs font-semibold mb-2">🎁 奖励：</p>
+                <div className="flex flex-wrap gap-2">
+                  {quest.rewards.gold && (
+                    <span className="text-yellow-400 text-xs">💰 {quest.rewards.gold}G</span>
+                  )}
+                  {quest.rewards.exp && (
+                    <span className="text-blue-400 text-xs">✨ {quest.rewards.exp}EXP</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => handleAcceptQuest(showQuestAccept)}
+              className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-sm transition-all"
+            >
+              📜 接取任务
+            </button>
+            <button
+              onClick={handleRejectQuest}
+              className="px-6 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-bold text-sm transition-all"
+            >
+              暂时不接
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-4">
         <div className="bg-gray-800/80 rounded-lg p-4 min-h-[120px]">
@@ -1117,10 +1339,10 @@ const BuildingScreen: React.FC = () => {
               </button>
             ) : (
               <button
-                onClick={() => { setShowContent('main'); setSelectedNpc(null); }}
-                className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-xs transition-all"
+                onClick={handleNextDialog}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs transition-all"
               >
-                返回
+                继续
               </button>
             )}
           </div>

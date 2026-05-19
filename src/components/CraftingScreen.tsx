@@ -83,8 +83,18 @@ export default function CraftingScreen() {
     <div className="min-h-screen bg-gray-900 text-white p-4">
       <div className="max-w-2xl mx-auto">
         <div className="bg-gray-800 rounded-lg p-4 mb-4">
-          <h2 className="text-xl font-bold text-yellow-400 mb-2">{currentBuilding?.icon} {currentBuilding?.name}</h2>
-          <p className="text-sm text-gray-400">{currentBuilding?.description}</p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-bold text-yellow-400 mb-2">{currentBuilding?.icon} {currentBuilding?.name}</h2>
+              <p className="text-sm text-gray-400">{currentBuilding?.description}</p>
+            </div>
+            <button
+              onClick={closeShop}
+              className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg font-semibold text-sm"
+            >
+              返回
+            </button>
+          </div>
           <p className="text-sm text-yellow-300 mt-2">💰 金币: {player.gold}</p>
         </div>
 
@@ -212,13 +222,6 @@ export default function CraftingScreen() {
             </div>
           )}
         </div>
-
-        <button
-          onClick={closeShop}
-          className="w-full py-3 bg-gray-600 hover:bg-gray-500 rounded-lg font-semibold text-lg"
-        >
-          返回
-        </button>
       </div>
     </div>
   );

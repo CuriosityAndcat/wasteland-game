@@ -10,13 +10,11 @@ interface DialogLine {
 
 const introDialogs: DialogLine[] = [
   { speaker: '旁白', content: '在一个被破坏的世界中...', portraitId: 'narrator' },
-  { speaker: '旁白', content: '拉多镇的一间小屋里，你从睡梦中醒来...', portraitId: 'narrator' },
-  { speaker: '父亲', content: '喂！太阳都晒到屁股了！还在睡懒觉！', portraitId: 'father' },
-  { speaker: '父亲', content: '什么？你说你想成为超级勇士？', portraitId: 'father' },
-  { speaker: '父亲', content: '哼！不知天高地厚！你以为超级勇士是那么容易当的吗？', portraitId: 'father' },
-  { speaker: '父亲', content: '既然你这么有骨气，今天就给我滚出这个家！', portraitId: 'father' },
-  { speaker: '父亲', content: '不成为超级勇士就别回来！滚吧！', portraitId: 'father' },
-  { speaker: '旁白', content: '你被父亲赶出了家门...', portraitId: 'narrator' },
+  { speaker: '旁白', content: '晨风镇，一个宁静的小镇，这里是你的故乡...', portraitId: 'narrator' },
+  { speaker: '旁白', content: '你站在晨风镇的街道上，看着来来往往的人们...', portraitId: 'narrator' },
+  { speaker: '旁白', content: '一个梦想在你的心中萌芽——成为超级勇士！', portraitId: 'narrator' },
+  { speaker: '旁白', content: '你听说镇外的矿洞里有一辆废弃的战车...', portraitId: 'narrator' },
+  { speaker: '旁白', content: '那也许是你冒险的开始！', portraitId: 'narrator' },
   { speaker: '旁白', content: '从此，你踏上了成为超级勇士的冒险之旅！', portraitId: 'narrator' },
   { speaker: '旁白', content: '前方的道路充满了危险与机遇，出发吧！', portraitId: 'narrator' },
 ];
@@ -39,7 +37,6 @@ const IntroScene: React.FC = () => {
   const getSpeakerColor = (speaker: string): string => {
     switch (speaker) {
       case '旁白': return 'text-blue-400';
-      case '父亲': return 'text-amber-400';
       default: return 'text-yellow-400';
     }
   };

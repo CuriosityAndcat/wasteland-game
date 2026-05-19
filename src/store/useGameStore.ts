@@ -1,6 +1,22 @@
 import { create } from 'zustand';
 import { GameState, Player, Tank, Item, Enemy, InventoryItem, Building } from '../types';
 import { enemies, items, locations, characters, tankModels, blueprints } from '../data/gameData';
+import { quests } from '../data/quests';
+import {
+  calculateDamage,
+  calculateExpForLevel,
+  checkLevelUp,
+  performLevelUp,
+  createStatusEffect,
+  isUnableToAct,
+  applyTurnStartEffects,
+  addStatusEffect,
+  clearNegativeEffects,
+  getEffectiveSpeed,
+  sortBattleOrder,
+  createBattleResult
+} from '../utils/battle';
+import { getQuestById } from '../data/quests';
 
 function handleEnemyDefeated(get: any, set: any, enemy: Enemy, player: Player, useTank?: boolean) {
   const expReward = enemy.expReward;
@@ -27,17 +43,9 @@ function handleEnemyDefeated(get: any, set: any, enemy: Enemy, player: Player, u
     get().addBattleMessage(`🏆 获得悬赏金 ${enemy.bounty} 金币！`);
   }
 
-  const expNeeded = newPlayer.level * 50;
-  if (newPlayer.exp >= expNeeded) {
-    newPlayer = {
-      ...newPlayer,
-      level: newPlayer.level + 1,
-      exp: newPlayer.exp - expNeeded,
-      maxHp: newPlayer.maxHp + 8,
-      hp: newPlayer.maxHp + 8,
-      attack: newPlayer.attack + 1,
-      defense: newPlayer.defense + 1
-    };
+  // 使用新的升级检查系统
+  while (checkLevelUp(newPlayer)) {
+    newPlayer = performLevelUp(newPlayer);
     get().addBattleMessage(`🎉 升级了！现在是${newPlayer.level}级！`);
   }
 
@@ -88,35 +96,127 @@ function processEnemyCounterAttack(get: any, set: any) {
   const currentState = get();
   if (!currentState.battle) return;
   
-  let defenseValue = 0;
-  if (currentState.battle.useTank) {
-    const tank = currentState.tanks[currentState.currentTankIndex];
-    defenseValue = tank.defense + (tank.engine?.value || 0) + (tank.cDevice?.value || 0) + (currentState.player.drivingLevel || 1) * 1;
-  } else {
-    defenseValue = currentState.player.defense + 
+  const { enemy } = currentState.battle;
+  
+  // 计算角色的有效防御力（包含装备加成和状态效果）
+  const effectivePlayer = {
+    ...currentState.player,
+    defense: currentState.player.defense + 
       (currentState.playerEquip.head?.value || 0) + 
       (currentState.playerEquip.body?.value || 0) + 
       (currentState.playerEquip.hand?.value || 0) + 
-      (currentState.playerEquip.foot?.value || 0);
+      (currentState.playerEquip.foot?.value || 0),
+    statusEffects: currentState.player.statusEffects || []
+  };
+  
+  // 检查角色是否无法行动（被眩晕/麻痹/冰冻）
+  if (isUnableToAct(effectivePlayer)) {
+    get().addBattleMessage(`⚠️ ${effectivePlayer.name}无法行动！`);
+    const effectMessage = effectivePlayer.statusEffects.find(e => 
+      e.type === 'paralyze' || e.type === 'freeze' || e.type === 'stun'
+    );
+    if (effectMessage) {
+      get().addBattleMessage(`${effectivePlayer.name} 被 ${effectMessage.name} 了！`);
+    }
+    
+    // 仍然切换回玩家回合
+    set({
+      battle: { ...currentState.battle, turn: 'player' }
+    });
+    return;
   }
   
-  const enemyDamage = Math.max(1, currentState.battle.enemy.attack - defenseValue + Math.floor(Math.random() * 3));
+  // 应用回合开始时的状态效果
+  const turnStartEffects = applyTurnStartEffects(effectivePlayer);
+  let finalDamage = 0;
+  
+  turnStartEffects.messages.forEach(msg => {
+    get().addBattleMessage(msg);
+  });
+  
+  // 检查是否有立即生效的伤害
+  if (turnStartEffects.hpChange < 0) {
+    const newHp = Math.max(0, effectivePlayer.hp + turnStartEffects.hpChange);
+    effectivePlayer.hp = newHp;
+    
+    if (newHp <= 0) {
+      set({
+        player: { ...effectivePlayer, hp: 0 },
+        battle: undefined,
+        gamePhase: 'explore',
+        battleLog: []
+      });
+      get().addMessage(`💀 ${effectivePlayer.name}被击败了...`);
+      get().addMessage('你被送到了最近的医院...');
+      setTimeout(() => {
+        set((state: GameState) => ({
+          player: { 
+            ...state.player, 
+            hp: Math.floor(state.player.maxHp / 2),
+            statusEffects: []
+          },
+          gold: Math.floor(state.player.gold * 0.9)
+        }));
+      }, 100);
+      return;
+    }
+  }
+  
+  // 敌人有一定概率使用特殊技能
+  let appliedEffects: any[] = [];
+  let damageResult;
+  
+  if (enemy.specialAbilities && enemy.specialAbilities.length > 0 && Math.random() < 0.3) {
+    // 30%概率使用特殊技能
+    const ability = enemy.specialAbilities[Math.floor(Math.random() * enemy.specialAbilities.length)];
+    damageResult = calculateDamage(enemy, effectivePlayer);
+    
+    get().addBattleMessage(`🔥 ${enemy.name} 使用了 ${ability.name}！`);
+    
+    if (ability.effectType && ability.effectChance && Math.random() < ability.effectChance) {
+      const effect = createStatusEffect(ability.effectType, 3);
+      if (!currentState.battle.useTank) {
+        const result = addStatusEffect(effectivePlayer, effect);
+        appliedEffects.push(effect);
+        get().addBattleMessage(result.message);
+      }
+    }
+  } else {
+    // 普通攻击
+    damageResult = calculateDamage(enemy, effectivePlayer);
+  }
+  
+  finalDamage = damageResult.finalDamage || 0;
   
   if (currentState.battle.useTank) {
     const updatedTanks = [...currentState.tanks];
+    const currentTank = updatedTanks[currentState.currentTankIndex];
+    const newArmor = Math.max(0, currentTank.armor - finalDamage);
     updatedTanks[currentState.currentTankIndex] = { 
-      ...updatedTanks[currentState.currentTankIndex], 
-      armor: Math.max(0, updatedTanks[currentState.currentTankIndex].armor - enemyDamage) 
+      ...currentTank, 
+      armor: newArmor 
     };
     
-    get().addBattleMessage(`💥 ${currentState.battle.enemy.name}对战车造成了 ${enemyDamage} 点伤害！`);
+    if (!damageResult.isHit) {
+      get().addBattleMessage(`💨 战车闪避了攻击！`);
+      get().triggerEffect('miss', 'enemy');
+    } else if (damageResult.isDodged) {
+      get().addBattleMessage(`💨 战车闪避了攻击！`);
+      get().triggerEffect('miss', 'enemy');
+    } else if (damageResult.isCrit) {
+      get().addBattleMessage(`💥 暴击！${enemy.name}对战车造成了 ${finalDamage} 点伤害！`);
+      get().triggerEffect('explosion', 'player');
+    } else {
+      get().addBattleMessage(`💥 ${enemy.name}对战车造成了 ${finalDamage} 点伤害！`);
+      get().triggerEffect('hit', 'player');
+    }
     
-    if (updatedTanks[currentState.currentTankIndex].armor <= 0) {
+    if (newArmor <= 0) {
+      get().addBattleMessage('⚠️ 战车装甲被击毁了！');
       set({
         tanks: updatedTanks,
         battle: { ...currentState.battle, useTank: false, turn: 'player' }
       });
-      get().addBattleMessage('⚠️ 战车装甲被击毁了！');
     } else {
       set({
         tanks: updatedTanks,
@@ -124,27 +224,51 @@ function processEnemyCounterAttack(get: any, set: any) {
       });
     }
   } else {
-    const newPlayerHp = Math.max(0, currentState.player.hp - enemyDamage);
-    get().addBattleMessage(`💥 ${currentState.battle.enemy.name}对${currentState.player.name}造成了 ${enemyDamage} 点伤害！`);
+    // 更新角色HP
+    let newPlayerHp = Math.max(0, effectivePlayer.hp - finalDamage);
+    
+    // 应用战斗消息
+    if (!damageResult.isHit) {
+      get().addBattleMessage(`💨 你闪避了攻击！`);
+      get().triggerEffect('miss', 'enemy');
+    } else if (damageResult.isDodged) {
+      get().addBattleMessage(`💨 你闪避了攻击！`);
+      get().triggerEffect('miss', 'enemy');
+    } else if (damageResult.isCrit) {
+      get().addBattleMessage(`💥 暴击！${enemy.name}对你造成了 ${finalDamage} 点伤害！`);
+      get().triggerEffect('explosion', 'player');
+    } else if (finalDamage > 0) {
+      get().addBattleMessage(`💥 ${enemy.name}对你造成了 ${finalDamage} 点伤害！`);
+      get().triggerEffect('hit', 'player');
+    }
     
     if (newPlayerHp <= 0) {
       set({
-        player: { ...currentState.player, hp: 0 },
+        player: { ...effectivePlayer, hp: 0 },
         battle: undefined,
         gamePhase: 'explore',
         battleLog: []
       });
-      get().addMessage(`💀 ${currentState.player.name}被击败了...`);
+      get().addMessage(`💀 ${effectivePlayer.name}被击败了...`);
       get().addMessage('你被送到了最近的医院...');
       setTimeout(() => {
         set((state: GameState) => ({
-          player: { ...state.player, hp: Math.floor(state.player.maxHp / 2) },
+          player: { 
+            ...state.player, 
+            hp: Math.floor(state.player.maxHp / 2),
+            statusEffects: []
+          },
           gold: Math.floor(state.player.gold * 0.9)
         }));
       }, 100);
     } else {
+      // 更新玩家状态（包括状态效果）
       set({
-        player: { ...currentState.player, hp: newPlayerHp },
+        player: { 
+          ...effectivePlayer, 
+          hp: newPlayerHp,
+          statusEffects: effectivePlayer.statusEffects 
+        },
         battle: { ...currentState.battle, turn: 'player' }
       });
     }
@@ -159,12 +283,18 @@ const initialPlayer: Player = {
   maxHp: 40,
   attack: 5,
   defense: 3,
+  speed: 10, // 新增
   gold: 50,
   exp: 0,
   role: '猎人',
   portraitId: 'hunter',
   drivingLevel: 1,
-  drivingExp: 0
+  drivingExp: 0,
+  statusEffects: [], // 新增
+  critRate: 0.1, // 新增
+  critDamage: 1.5, // 新增
+  dodgeRate: 0.05, // 新增
+  hitRate: 0.95 // 新增
 };
 
 const initialInventory: InventoryItem[] = [
@@ -172,7 +302,7 @@ const initialInventory: InventoryItem[] = [
   { item: items.find(i => i.id === 'i2')!, quantity: 2 }
 ];
 
-export const useGameStore = create<GameState & {
+type GameStoreActions = {
   startGame: (playerName?: string) => void;
   selectCharacter: (characterId: string) => void;
   moveToLocation: (locationId: string) => void;
@@ -221,7 +351,13 @@ export const useGameStore = create<GameState & {
   learnBlueprint: (blueprintId: string) => void;
   openCrafting: () => void;
   closeCrafting: () => void;
-}>((set, get) => ({
+  addQuest: (questId: string) => void;
+  updateQuestObjective: (questId: string, objectiveId: string, progress: number) => void;
+  completeQuest: (questId: string) => void;
+  triggerEffect: (type: string, position: 'enemy' | 'player') => void;
+};
+
+export const useGameStore = create<GameState & GameStoreActions>((set, get) => ({
   player: initialPlayer,
   members: [initialPlayer],
   currentMemberIndex: 0,
@@ -245,6 +381,11 @@ export const useGameStore = create<GameState & {
   locations: locations,
   shopItems: [],
   currentDialogId: undefined,
+  quests: {
+    available: [],
+    inProgress: [],
+    completed: []
+  },
 
   startGame: (playerName?: string) => {
     const newPlayer: Player = {
@@ -255,13 +396,22 @@ export const useGameStore = create<GameState & {
       hp: 40,
       attack: 5,
       defense: 3,
+      speed: 10, // 新增：初始速度
       portraitId: 'hunter',
       drivingLevel: 1,
       drivingExp: 0,
       level: 1,
       exp: 0,
-      gold: 50
+      gold: 50,
+      statusEffects: [], // 新增：空状态效果列表
+      critRate: 0.1, // 新增：10%暴击率
+      critDamage: 1.5, // 新增：1.5倍暴击伤害
+      dodgeRate: 0.05, // 新增：5%闪避率
+      hitRate: 0.95 // 新增：95%命中率
     };
+    
+    const mainQuest1 = quests.find(q => q.id === 'main_1');
+    
     set({
       player: newPlayer,
       members: [newPlayer],
@@ -285,7 +435,20 @@ export const useGameStore = create<GameState & {
       blueprints: [],
       locations: locations,
       shopItems: [],
-      currentDialogId: undefined
+      currentDialogId: undefined,
+      quests: {
+        available: [],
+        inProgress: mainQuest1 ? [{
+          ...mainQuest1,
+          objectives: mainQuest1.objectives.map(obj => ({
+            ...obj,
+            currentCount: 0,
+            completed: false
+          }))
+        }] : [],
+        completed: []
+      },
+      currentQuestId: 'main_1'
     });
   },
 
@@ -306,12 +469,18 @@ export const useGameStore = create<GameState & {
       hp: character.baseHp,
       attack: character.baseAttack,
       defense: character.baseDefense,
+      speed: 10, // 新增：初始速度
       gold: 50,
       exp: 0,
       level: 1,
       portraitId: character.portraitId,
       drivingLevel: 1,
-      drivingExp: 0
+      drivingExp: 0,
+      statusEffects: [], // 新增
+      critRate: 0.1, // 新增
+      critDamage: 1.5, // 新增
+      dodgeRate: 0.05, // 新增
+      hitRate: 0.95 // 新增
     };
     set({
       player: newPlayer,
@@ -403,11 +572,36 @@ export const useGameStore = create<GameState & {
     const { enemy } = state.battle;
     if (state.battle.useTank) return;
     
-    const attackPower = state.player.attack + (state.playerEquip.weapon?.value || 0);
-    const damage = Math.max(1, attackPower - enemy.defense + Math.floor(Math.random() * 3));
-    const newEnemy = { ...enemy, hp: Math.max(0, enemy.hp - damage) };
+    // 计算角色的有效攻击力（装备加成）
+    const effectivePlayer = {
+      ...state.player,
+      attack: state.player.attack + (state.playerEquip.weapon?.value || 0),
+      defense: state.player.defense + 
+        (state.playerEquip.head?.value || 0) + 
+        (state.playerEquip.body?.value || 0) + 
+        (state.playerEquip.hand?.value || 0) + 
+        (state.playerEquip.foot?.value || 0)
+    };
     
-    get().addBattleMessage(`⚔️ 你对${enemy.name}造成了 ${damage} 点伤害！`);
+    // 使用新的伤害计算系统
+    const damageResult = calculateDamage(effectivePlayer, enemy);
+    
+    let newEnemy = { ...enemy, hp: Math.max(0, enemy.hp - (damageResult.finalDamage || 0)) };
+    
+    // 应用战斗结果消息
+    if (damageResult.isDodged || !damageResult.isHit) {
+      get().addBattleMessage(`💨 ${enemy.name} 闪避了攻击！`);
+      // 触发闪避特效
+      get().triggerEffect('miss', 'player');
+    } else if (damageResult.isCrit) {
+      get().addBattleMessage(`💥 暴击！对${enemy.name}造成了 ${damageResult.finalDamage} 点伤害！`);
+      // 触发爆炸特效
+      get().triggerEffect('explosion', 'enemy');
+    } else {
+      get().addBattleMessage(`⚔️ 你对${enemy.name}造成了 ${damageResult.finalDamage} 点伤害！`);
+      // 触发命中特效
+      get().triggerEffect('hit', 'enemy');
+    }
     
     if (newEnemy.hp <= 0) {
       handleEnemyDefeated(get, set, enemy, state.player);
@@ -524,9 +718,9 @@ export const useGameStore = create<GameState & {
     if (!state.battle) return;
 
     const { enemy } = state.battle;
-    get().addBattleMessage(`🛡️ ${state.player.name}进入防御姿态！`);
-
     const useTank = state.battle.useTank;
+    
+    // 计算防御力
     let defensePower = 0;
     if (useTank) {
       const tank = state.tanks[state.currentTankIndex];
@@ -538,44 +732,55 @@ export const useGameStore = create<GameState & {
         (state.playerEquip.hand?.value || 0) +
         (state.playerEquip.foot?.value || 0);
     }
-    defensePower = Math.floor(defensePower * 1.5);
+    
+    // 防御时提升50%防御力
+    const effectiveDefense = Math.floor(defensePower * 1.5);
+    
+    get().addBattleMessage(`🛡️ ${state.player.name}进入防御姿态！防御力提升！`);
 
     if (enemy.hp > 0) {
-      const enemyDamage = Math.max(1, enemy.attack - defensePower);
-      get().addBattleMessage(`💥 ${enemy.name}的攻击造成了 ${enemyDamage} 点伤害！（防御减半）`);
+      // 使用新的伤害计算系统，防御时传入 isDefending = true
+      const damageResult = calculateDamage(enemy, { ...state.player, defense: effectiveDefense }, true);
       
-      if (useTank) {
-        const tank = { ...state.tanks[state.currentTankIndex] };
-        tank.armor = Math.max(0, tank.armor - enemyDamage);
-        const newTanks = [...state.tanks];
-        newTanks[state.currentTankIndex] = tank;
-        
-        let newBattleState = { ...state.battle, turn: 'enemy' };
-        
-        if (tank.armor <= 0) {
-          get().addBattleMessage('⚠️ 战车装甲被击毁了！');
-          newBattleState = { ...newBattleState, useTank: false };
-        }
-        
-        set({ tanks: newTanks, battle: newBattleState });
+      if (!damageResult.isHit || damageResult.isDodged) {
+        get().addBattleMessage(`💨 ${useTank ? '战车' : state.player.name}闪避了攻击！`);
+        get().triggerEffect('miss', 'enemy');
       } else {
-        const newHp = Math.max(0, state.player.hp - enemyDamage);
+        get().addBattleMessage(`💥 ${enemy.name}的攻击造成了 ${damageResult.finalDamage} 点伤害！（防御减半）`);
         
-        if (newHp <= 0) {
-          get().addBattleMessage(`💀 ${state.player.name}被击败了...`);
-          set({ 
-            player: { ...state.player, hp: 0 },
-            gamePhase: 'explore', 
-            battle: undefined, 
-            battleLog: [] 
+        if (useTank) {
+          const currentTank = state.tanks[state.currentTankIndex];
+          const newArmor = Math.max(0, currentTank.armor - damageResult.finalDamage);
+          const updatedTanks = [...state.tanks];
+          updatedTanks[state.currentTankIndex] = { ...currentTank, armor: newArmor };
+          
+          let newBattleState = { ...state.battle!, turn: 'enemy' as const };
+          
+          if (newArmor <= 0) {
+            get().addBattleMessage('⚠️ 战车装甲被击毁了！');
+            newBattleState = { ...newBattleState, useTank: false };
+          }
+          
+          set({ tanks: updatedTanks, battle: newBattleState });
+        } else {
+          const newHp = Math.max(0, state.player.hp - damageResult.finalDamage);
+          
+          if (newHp <= 0) {
+            get().addBattleMessage(`💀 ${state.player.name}被击败了...`);
+            set({ 
+              player: { ...state.player, hp: 0, statusEffects: [] },
+              gamePhase: 'explore', 
+              battle: undefined, 
+              battleLog: [] 
+            });
+            return;
+          }
+          
+          set({
+            player: { ...state.player, hp: newHp },
+            battle: { ...state.battle, turn: 'enemy' }
           });
-          return;
         }
-        
-        set({
-          player: { ...state.player, hp: newHp },
-          battle: { ...state.battle, turn: 'enemy' }
-        });
       }
       
       setTimeout(() => processEnemyCounterAttack(get, set), 1500);
@@ -617,7 +822,14 @@ export const useGameStore = create<GameState & {
         // 投掷物
         if (isInBattle && state.battle) {
           const currentEnemy = state.battle.enemy;
-          const damage = Math.max(1, item.value - currentEnemy.defense);
+          
+          // 使用新的伤害计算系统
+          const thrower = state.player;
+          const damageResult = calculateDamage(
+            { ...thrower, attack: item.value }, // 投掷物伤害作为攻击力
+            currentEnemy
+          );
+          const damage = damageResult.finalDamage || 0;
           const newEnemyHp = Math.max(0, currentEnemy.hp - damage);
           
           // 一次性更新所有状态
@@ -628,7 +840,49 @@ export const useGameStore = create<GameState & {
             ).filter(i => i.quantity > 0)
           });
           
-          get().addBattleMessage(`💣 使用了${item.name}，对${currentEnemy.name}造成了 ${damage} 点伤害！`);
+          if (damageResult.isCrit) {
+            get().addBattleMessage(`💥 暴击！使用了${item.name}，对${currentEnemy.name}造成了 ${damage} 点伤害！`);
+          } else {
+            get().addBattleMessage(`💣 使用了${item.name}，对${currentEnemy.name}造成了 ${damage} 点伤害！`);
+          }
+          
+          if (newEnemyHp <= 0) {
+            handleEnemyDefeated(get, set, currentEnemy, state.player, state.battle.useTank);
+            return;
+          }
+          
+          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+        } else {
+          set({
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          get().addMessage(`使用了${item.name}！`);
+        }
+      } else if (item.id === 'i10') {
+        // 药液 - 造成腐蚀伤害 + 中毒效果
+        if (isInBattle && state.battle) {
+          const currentEnemy = state.battle.enemy;
+          const damage = Math.floor(item.value * 0.8); // 腐蚀伤害较低
+          const newEnemyHp = Math.max(0, currentEnemy.hp - damage);
+          
+          // 添加中毒效果
+          const poisonEffect = createStatusEffect('poison', 3, 5);
+          const updatedEnemy = {
+            ...currentEnemy,
+            hp: newEnemyHp,
+            statusEffects: [...(currentEnemy.statusEffects || []), poisonEffect]
+          };
+          
+          set({
+            battle: { ...state.battle, enemy: updatedEnemy, turn: 'enemy' },
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          
+          get().addBattleMessage(`☠️ 使用了${item.name}，对${currentEnemy.name}造成了 ${damage} 点腐蚀伤害并附加中毒效果！`);
           
           if (newEnemyHp <= 0) {
             handleEnemyDefeated(get, set, currentEnemy, state.player, state.battle.useTank);
@@ -669,14 +923,169 @@ export const useGameStore = create<GameState & {
         } else {
           get().addMessage(`🔧 使用了${item.name}，恢复了 ${item.value} 装甲！`);
         }
-      } else if (item.id === 'i7') {
-        // 军号 - 攻击力提升
+      } else if (item.id === 'i5') {
+        // 解药 - 清除中毒状态
+        if (state.player.statusEffects && state.player.statusEffects.length > 0) {
+          const clearedEffects = clearNegativeEffects(state.player);
+          if (clearedEffects.length > 0) {
+            set({
+              player: { ...state.player, statusEffects: state.player.statusEffects },
+              inventory: state.inventory.map(i => 
+                i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+              ).filter(i => i.quantity > 0)
+            });
+            get().addBattleMessage(`💊 使用了${item.name}，清除了 ${clearedEffects.join('、')} 效果！`);
+          } else {
+            get().addBattleMessage(`⚠️ 当前没有负面状态效果！`);
+          }
+        } else {
+          get().addBattleMessage(`⚠️ 当前没有负面状态效果！`);
+        }
+        
         if (isInBattle) {
-          get().addBattleMessage(`📯 使用了${item.name}，攻击力提升！`);
-          // 战斗中使用后轮到敌人
           set({ battle: { ...state.battle!, turn: 'enemy' } });
           setTimeout(() => processEnemyCounterAttack(get, set), 1500);
         }
+      } else if (item.id === 'i6') {
+        // 烟幕 - 降低敌人命中率
+        if (isInBattle && state.battle) {
+          get().addBattleMessage(`🌫️ 使用了${item.name}，降低了敌人的命中率！`);
+          // 简化处理：直接扣除道具
+          set({
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          set({ battle: { ...state.battle!, turn: 'enemy' } });
+          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+        } else {
+          set({
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          get().addMessage(`使用了${item.name}！`);
+        }
+      } else if (item.id === 'i7') {
+        // 军号 - 攻击力提升
+        if (isInBattle) {
+          const attackUpEffect = createStatusEffect('attackUp', 3, 0.5);
+          const result = addStatusEffect(state.player, attackUpEffect);
+          set({
+            player: state.player,
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          get().addBattleMessage(`📯 使用了${item.name}！攻击力提升50%，持续3回合！`);
+          set({ battle: { ...state.battle!, turn: 'enemy' } });
+          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+        } else {
+          set({
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          get().addMessage(`使用了${item.name}！攻击力提升50%！`);
+        }
+      } else if (item.id === 'i8') {
+        // 雷达 - 攻击力和命中提升
+        if (isInBattle) {
+          const attackUpEffect = createStatusEffect('attackUp', 3, 0.5);
+          const defenseUpEffect = createStatusEffect('defenseUp', 3, 0.3);
+          addStatusEffect(state.player, attackUpEffect);
+          const result2 = addStatusEffect(state.player, defenseUpEffect);
+          set({
+            player: state.player,
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          get().addBattleMessage(`📡 使用了${item.name}！攻击力提升50%，防御力提升30%，持续3回合！`);
+          set({ battle: { ...state.battle!, turn: 'enemy' } });
+          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+        } else {
+          set({
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          get().addMessage(`使用了${item.name}！攻击力提升50%，防御力提升30%！`);
+        }
+      } else if (item.id === 'i9') {
+        // 地图 - 提升命中率
+        if (isInBattle) {
+          get().addBattleMessage(`🗺️ 使用了${item.name}，本场战斗命中率提升！`);
+          set({
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          set({ battle: { ...state.battle!, turn: 'enemy' } });
+          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+        } else {
+          set({
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          get().addMessage(`使用了${item.name}！`);
+        }
+      } else if (item.id === 'i16') {
+        // 石蜡 - 酸中和
+        if (isInBattle && state.battle) {
+          get().addBattleMessage(`🕯️ 使用了${item.name}，酸液被中和了！`);
+          set({
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          set({ battle: { ...state.battle!, turn: 'enemy' } });
+          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+        } else {
+          set({
+            inventory: state.inventory.map(i => 
+              i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+            ).filter(i => i.quantity > 0)
+          });
+          get().addMessage(`使用了${item.name}！`);
+        }
+      } else if (item.id === 'i17') {
+        // 迷彩条 - 降低遇敌率
+        set({
+          inventory: state.inventory.map(i => 
+            i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+          ).filter(i => i.quantity > 0)
+        });
+        get().addMessage(`使用了${item.name}！接下来的遇敌率降低！`);
+      } else if (item.id === 'i11') {
+        // 再生丸 - 复活并添加再生效果
+        const regenEffect = createStatusEffect('regen', 5, 10);
+        addStatusEffect(state.player, regenEffect);
+        set({
+          player: {
+            ...state.player,
+            hp: Math.floor(state.player.maxHp * 0.5)
+          },
+          inventory: state.inventory.map(i => 
+            i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+          ).filter(i => i.quantity > 0)
+        });
+        if (isInBattle) {
+          get().addBattleMessage(`💚 使用了${item.name}！HP恢复至50%，并附加再生效果，每回合恢复10HP，持续5回合！`);
+          set({ battle: { ...state.battle!, turn: 'enemy' } });
+          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+        } else {
+          get().addMessage(`💚 使用了${item.name}！HP恢复至50%，并附加再生效果！`);
+        }
+      } else if (item.id === 'i15') {
+        // 传真 - 瞬间传送
+        set({
+          inventory: state.inventory.map(i => 
+            i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+          ).filter(i => i.quantity > 0)
+        });
+        get().addMessage(`🌀 使用了${item.name}！传送回最近的城镇！`);
       } else {
         // 其他消耗品
         set({
@@ -884,12 +1293,18 @@ export const useGameStore = create<GameState & {
       maxHp: character.baseHp,
       attack: character.baseAttack,
       defense: character.baseDefense,
+      speed: 10,
       gold: 0,
       exp: 0,
       role: character.role,
       portraitId: character.portraitId,
       drivingLevel: 1,
-      drivingExp: 0
+      drivingExp: 0,
+      statusEffects: [],
+      critRate: 0.1,
+      critDamage: 1.5,
+      dodgeRate: 0.05,
+      hitRate: 0.95
     };
 
     set(state => ({
@@ -1070,7 +1485,13 @@ export const useGameStore = create<GameState & {
       battle: undefined,
       battleLog: [],
       blueprints: [],
-      warehouseItems: []
+      warehouseItems: [],
+      quests: {
+        available: [],
+        inProgress: [],
+        completed: []
+      },
+      currentQuestId: undefined
     });
   },
 
@@ -1202,5 +1623,141 @@ export const useGameStore = create<GameState & {
 
   closeCrafting: () => {
     set({ gamePhase: 'explore' });
+  },
+
+  addQuest: (questId: string) => {
+    const state = get();
+    const quest = quests.find(q => q.id === questId);
+    if (!quest) return;
+    
+    // 检查任务是否已存在
+    const existsInProgress = state.quests.inProgress.some(q => q.id === questId);
+    const existsCompleted = state.quests.completed.some(q => q.id === questId);
+    if (existsInProgress || existsCompleted) return;
+    
+    // 检查前置任务
+    if (quest.prerequisiteQuestId) {
+      const prereqCompleted = state.quests.completed.some(q => q.id === quest.prerequisiteQuestId);
+      if (!prereqCompleted) return;
+    }
+    
+    const questWithProgress = {
+      ...quest,
+      objectives: quest.objectives.map(obj => ({
+        ...obj,
+        currentCount: 0,
+        completed: false
+      }))
+    };
+    
+    set({
+      quests: {
+        ...state.quests,
+        inProgress: [...state.quests.inProgress, questWithProgress]
+      },
+      currentQuestId: questId
+    });
+    
+    get().addMessage(`📜 接受新任务：${quest.name}`);
+  },
+
+  updateQuestObjective: (questId: string, objectiveId: string, progress: number) => {
+    const state = get();
+    const questIndex = state.quests.inProgress.findIndex(q => q.id === questId);
+    if (questIndex === -1) return;
+    
+    const quest = state.quests.inProgress[questIndex];
+    const objectiveIndex = quest.objectives.findIndex(o => o.id === objectiveId);
+    if (objectiveIndex === -1) return;
+    
+    const updatedObjectives = [...quest.objectives];
+    const objective = updatedObjectives[objectiveIndex];
+    const newCount = (objective.currentCount || 0) + progress;
+    const isCompleted = objective.targetCount ? newCount >= objective.targetCount : true;
+    
+    updatedObjectives[objectiveIndex] = {
+      ...objective,
+      currentCount: newCount,
+      completed: isCompleted
+    };
+    
+    const updatedQuest = { ...quest, objectives: updatedObjectives };
+    const updatedInProgress = [...state.quests.inProgress];
+    updatedInProgress[questIndex] = updatedQuest;
+    
+    const allObjectivesCompleted = updatedObjectives.every(o => o.completed || 
+      (o.targetCount && o.currentCount !== undefined && o.currentCount >= o.targetCount));
+    
+    if (allObjectivesCompleted) {
+      get().completeQuest(questId);
+    } else {
+      set({
+        quests: {
+          ...state.quests,
+          inProgress: updatedInProgress
+        }
+      });
+    }
+  },
+
+  completeQuest: (questId: string) => {
+    const state = get();
+    const questIndex = state.quests.inProgress.findIndex(q => q.id === questId);
+    if (questIndex === -1) return;
+    
+    const quest = state.quests.inProgress[questIndex];
+    
+    // 发放奖励
+    let newPlayer = { ...state.player };
+    let newGold = state.gold;
+    let newExp = state.player.exp;
+    
+    if (quest.rewards) {
+      if (quest.rewards.gold) {
+        newGold += quest.rewards.gold;
+      }
+      if (quest.rewards.exp) {
+        newExp += quest.rewards.exp;
+        const expNeeded = newPlayer.level * 50;
+        if (newExp >= expNeeded) {
+          newPlayer = {
+            ...newPlayer,
+            level: newPlayer.level + 1,
+            exp: newExp - expNeeded,
+            maxHp: newPlayer.maxHp + 8,
+            hp: newPlayer.maxHp + 8,
+            attack: newPlayer.attack + 1,
+            defense: newPlayer.defense + 1
+          };
+        }
+      }
+    }
+    
+    // 移除已完成的任务，任务由玩家主动接取
+    const newInProgress = state.quests.inProgress.filter(q => q.id !== questId);
+    
+    set({
+      player: newPlayer,
+      gold: newGold,
+      quests: {
+        ...state.quests,
+        inProgress: newInProgress,
+        completed: [...state.quests.completed, quest]
+      }
+    });
+    
+    let rewardMsg = `🎉 完成任务：${quest.name}！`;
+    if (quest.rewards) {
+      const rewards = [];
+      if (quest.rewards.gold) rewards.push(`${quest.rewards.gold}G`);
+      if (quest.rewards.exp) rewards.push(`${quest.rewards.exp}EXP`);
+      if (rewards.length > 0) {
+        rewardMsg += ` 获得奖励：${rewards.join('、')}`;
+      }
+    }
+    get().addMessage(rewardMsg);
+  },
+
+  triggerEffect: (type: string, position: 'enemy' | 'player') => {
   }
 }));

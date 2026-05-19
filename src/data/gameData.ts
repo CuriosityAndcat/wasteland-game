@@ -1,28 +1,221 @@
 import { Enemy, Item, Location, Blueprint } from '../types';
 
 export const enemies: Enemy[] = [
-  { id: 'e1', name: '巨蚁', hp: 10, maxHp: 10, attack: 8, defense: 3, expReward: 5, goldReward: 5, portraitId: 'e1' },
-  { id: 'e3', name: '杀人虫', hp: 16, maxHp: 16, attack: 16, defense: 5, expReward: 12, goldReward: 12, portraitId: 'e3' },
-  { id: 'e4', name: '仿生蜗牛', hp: 20, maxHp: 20, attack: 22, defense: 10, expReward: 15, goldReward: 18, portraitId: 'e4' },
-  { id: 'e5', name: '蜈蚣', hp: 20, maxHp: 20, attack: 20, defense: 7, expReward: 15, goldReward: 15, portraitId: 'e5' },
-  { id: 'e6', name: '蝎子', hp: 25, maxHp: 25, attack: 22, defense: 8, expReward: 18, goldReward: 18, portraitId: 'e6' },
-  { id: 'e7', name: '机器人', hp: 35, maxHp: 35, attack: 26, defense: 10, expReward: 25, goldReward: 25, portraitId: 'e7' },
-  { id: 'e8', name: '变异鼠', hp: 30, maxHp: 30, attack: 24, defense: 9, expReward: 22, goldReward: 22, portraitId: 'e8' },
-  { id: 'e9', name: '强化兵', hp: 45, maxHp: 45, attack: 32, defense: 12, expReward: 35, goldReward: 35, portraitId: 'e9' },
-  { id: 'e10', name: '铁甲兵', hp: 55, maxHp: 55, attack: 36, defense: 15, expReward: 45, goldReward: 45, portraitId: 'e10' },
+  { 
+    id: 'e1', name: '巨蚁', hp: 10, maxHp: 10, attack: 8, defense: 3, speed: 8,
+    expReward: 5, goldReward: 5, portraitId: 'e1',
+    statusEffects: [],
+    critRate: 0.05, critDamage: 1.3, dodgeRate: 0.05,
+    specialAbilities: [
+      { name: '巨蚁叮咬', description: '有30%概率造成中毒', effectType: 'poison', effectChance: 0.3, damageMultiplier: 1 }
+    ]
+  },
+  { 
+    id: 'e3', name: '杀人虫', hp: 16, maxHp: 16, attack: 16, defense: 5, speed: 12,
+    expReward: 12, goldReward: 12, portraitId: 'e3',
+    statusEffects: [],
+    critRate: 0.08, critDamage: 1.4, dodgeRate: 0.08,
+    specialAbilities: [
+      { name: '毒素喷雾', description: '有40%概率造成中毒', effectType: 'poison', effectChance: 0.4, damageMultiplier: 1 }
+    ]
+  },
+  { 
+    id: 'e4', name: '仿生蜗牛', hp: 20, maxHp: 20, attack: 22, defense: 10, speed: 5,
+    expReward: 15, goldReward: 18, portraitId: 'e4',
+    statusEffects: [],
+    critRate: 0.05, critDamage: 1.3, dodgeRate: 0.03,
+    specialAbilities: [
+      { name: '粘液附着', description: '有35%概率造成减速', effectType: 'slow', effectChance: 0.35, damageMultiplier: 1 }
+    ]
+  },
+  { 
+    id: 'e5', name: '蜈蚣', hp: 20, maxHp: 20, attack: 20, defense: 7, speed: 15,
+    expReward: 15, goldReward: 15, portraitId: 'e5',
+    statusEffects: [],
+    critRate: 0.1, critDamage: 1.4, dodgeRate: 0.1,
+    specialAbilities: [
+      { name: '毒刺攻击', description: '有50%概率造成中毒', effectType: 'poison', effectChance: 0.5, damageMultiplier: 1 }
+    ]
+  },
+  { 
+    id: 'e6', name: '蝎子', hp: 25, maxHp: 25, attack: 22, defense: 8, speed: 10,
+    expReward: 18, goldReward: 18, portraitId: 'e6',
+    statusEffects: [],
+    critRate: 0.12, critDamage: 1.5, dodgeRate: 0.08,
+    specialAbilities: [
+      { name: '毒尾穿刺', description: '有60%概率造成中毒', effectType: 'poison', effectChance: 0.6, damageMultiplier: 1.2 },
+      { name: '蝎钳攻击', description: '普通攻击，伤害提升20%', effectType: undefined, effectChance: 0.4, damageMultiplier: 1.2 }
+    ]
+  },
+  { 
+    id: 'e7', name: '机器人', hp: 35, maxHp: 35, attack: 26, defense: 10, speed: 12,
+    expReward: 25, goldReward: 25, portraitId: 'e7',
+    statusEffects: [],
+    critRate: 0.08, critDamage: 1.4, dodgeRate: 0.06,
+    specialAbilities: [
+      { name: '电击光束', description: '有45%概率造成麻痹', effectType: 'paralyze', effectChance: 0.45, damageMultiplier: 1 }
+    ]
+  },
+  { 
+    id: 'e8', name: '变异鼠', hp: 30, maxHp: 30, attack: 24, defense: 9, speed: 18,
+    expReward: 22, goldReward: 22, portraitId: 'e8',
+    statusEffects: [],
+    critRate: 0.15, critDamage: 1.6, dodgeRate: 0.15,
+    specialAbilities: [
+      { name: '撕咬攻击', description: '有40%概率造成流血', effectType: 'bleed', effectChance: 0.4, damageMultiplier: 1 }
+    ]
+  },
+  { 
+    id: 'e9', name: '强化兵', hp: 45, maxHp: 45, attack: 32, defense: 12, speed: 14,
+    expReward: 35, goldReward: 35, portraitId: 'e9',
+    statusEffects: [],
+    critRate: 0.1, critDamage: 1.5, dodgeRate: 0.08,
+    specialAbilities: [
+      { name: '强化打击', description: '普通攻击，伤害提升30%', effectType: undefined, effectChance: 0.5, damageMultiplier: 1.3 },
+      { name: '战吼', description: '降低敌人攻击力', effectType: 'attackDown', effectChance: 0.3, damageMultiplier: 0.8 }
+    ]
+  },
+  { 
+    id: 'e10', name: '铁甲兵', hp: 55, maxHp: 55, attack: 36, defense: 15, speed: 10,
+    expReward: 45, goldReward: 45, portraitId: 'e10',
+    statusEffects: [],
+    critRate: 0.08, critDamage: 1.4, dodgeRate: 0.05,
+    specialAbilities: [
+      { name: '铁甲防御', description: '提升自身防御力', effectType: 'defenseUp', effectChance: 0.4, damageMultiplier: 0.8 },
+      { name: '铁拳冲击', description: '伤害提升40%', effectType: undefined, effectChance: 0.6, damageMultiplier: 1.4 }
+    ]
+  },
 
-  { id: 'boss0', name: '狂犬首领', hp: 150, maxHp: 150, attack: 30, defense: 8, expReward: 100, goldReward: 50, isBoss: true, bounty: 100, portraitId: 'boss0' },
-  { id: 'boss1', name: '深渊巨兽', hp: 300, maxHp: 300, attack: 35, defense: 10, expReward: 150, goldReward: 200, isBoss: true, bounty: 1000, portraitId: 'boss1' },
-  { id: 'boss2', name: '暗影潜伏者', hp: 800, maxHp: 800, attack: 45, defense: 15, expReward: 300, goldReward: 400, isBoss: true, bounty: 3000, portraitId: 'boss2' },
-  { id: 'boss3', name: '钢铁巨兽', hp: 2000, maxHp: 2000, attack: 60, defense: 25, expReward: 800, goldReward: 1000, isBoss: true, bounty: 5000, portraitId: 'boss3' },
-  { id: 'boss4', name: '独眼巨人', hp: 1500, maxHp: 1500, attack: 50, defense: 20, expReward: 500, goldReward: 600, isBoss: true, bounty: 8000, portraitId: 'boss4' },
-  { id: 'boss5', name: '变异体', hp: 1200, maxHp: 1200, attack: 40, defense: 18, expReward: 400, goldReward: 500, isBoss: true, bounty: 1000, portraitId: 'boss5' },
-  { id: 'boss6', name: '铁血将军', hp: 2500, maxHp: 2500, attack: 65, defense: 30, expReward: 1000, goldReward: 1500, isBoss: true, bounty: 10000, portraitId: 'boss6' },
-  { id: 'boss7', name: '大象', hp: 3000, maxHp: 3000, attack: 70, defense: 35, expReward: 1200, goldReward: 1800, isBoss: true, bounty: 10000, portraitId: 'boss7' },
-  { id: 'boss8', name: '百足巨虫', hp: 3500, maxHp: 3500, attack: 75, defense: 40, expReward: 1500, goldReward: 2000, isBoss: true, bounty: 32000, portraitId: 'boss8' },
-  { id: 'boss9', name: '黑风', hp: 4000, maxHp: 4000, attack: 80, defense: 45, expReward: 2000, goldReward: 3000, isBoss: true, bounty: 50000, portraitId: 'boss9' },
-  { id: 'boss10', name: '暗影首领', hp: 4500, maxHp: 4500, attack: 85, defense: 50, expReward: 2500, goldReward: 4000, isBoss: true, bounty: 99800, portraitId: 'boss10' },
-  { id: 'boss11', name: '审判者AI', hp: 10000, maxHp: 10000, attack: 100, defense: 60, expReward: 5000, goldReward: 10000, isBoss: true, portraitId: 'boss11' }
+  // Boss敌人
+  { 
+    id: 'boss0', name: '狂犬首领', hp: 150, maxHp: 150, attack: 30, defense: 8, speed: 20,
+    expReward: 100, goldReward: 50, isBoss: true, bounty: 100, portraitId: 'boss0',
+    statusEffects: [],
+    critRate: 0.15, critDamage: 1.6, dodgeRate: 0.12,
+    specialAbilities: [
+      { name: '狂犬撕咬', description: '有70%概率造成流血', effectType: 'bleed', effectChance: 0.7, damageMultiplier: 1.3 },
+      { name: '狂怒咆哮', description: '狂暴攻击，伤害提升50%', effectType: 'attackUp', effectChance: 0.3, damageMultiplier: 1.5 }
+    ]
+  },
+  { 
+    id: 'boss1', name: '深渊巨兽', hp: 300, maxHp: 300, attack: 35, defense: 10, speed: 12,
+    expReward: 150, goldReward: 200, isBoss: true, bounty: 1000, portraitId: 'boss1',
+    statusEffects: [],
+    critRate: 0.12, critDamage: 1.6, dodgeRate: 0.08,
+    specialAbilities: [
+      { name: '深渊之触', description: '有60%概率造成中毒', effectType: 'poison', effectChance: 0.6, damageMultiplier: 1.2 },
+      { name: '重压攻击', description: '伤害提升40%', effectType: undefined, effectChance: 0.4, damageMultiplier: 1.4 }
+    ]
+  },
+  { 
+    id: 'boss2', name: '暗影潜伏者', hp: 800, maxHp: 800, attack: 45, defense: 15, speed: 25,
+    expReward: 300, goldReward: 400, isBoss: true, bounty: 3000, portraitId: 'boss2',
+    statusEffects: [],
+    critRate: 0.2, critDamage: 1.8, dodgeRate: 0.2,
+    specialAbilities: [
+      { name: '暗影穿刺', description: '有65%概率造成流血', effectType: 'bleed', effectChance: 0.65, damageMultiplier: 1.4 },
+      { name: '黑暗笼罩', description: '有55%概率造成恐惧/减速', effectType: 'slow', effectChance: 0.55, damageMultiplier: 1.2 },
+      { name: '背刺暴击', description: '100%暴击', effectType: undefined, effectChance: 0.25, damageMultiplier: 2 }
+    ]
+  },
+  { 
+    id: 'boss3', name: '钢铁巨兽', hp: 2000, maxHp: 2000, attack: 60, defense: 25, speed: 8,
+    expReward: 800, goldReward: 1000, isBoss: true, bounty: 5000, portraitId: 'boss3',
+    statusEffects: [],
+    critRate: 0.1, critDamage: 1.7, dodgeRate: 0.03,
+    specialAbilities: [
+      { name: '钢铁践踏', description: '有50%概率造成眩晕', effectType: 'stun', effectChance: 0.5, damageMultiplier: 1.3 },
+      { name: '装甲强化', description: '提升自身防御力', effectType: 'defenseUp', effectChance: 0.35, damageMultiplier: 0.8 },
+      { name: '巨型冲击', description: '伤害提升60%', effectType: undefined, effectChance: 0.4, damageMultiplier: 1.6 }
+    ]
+  },
+  { 
+    id: 'boss4', name: '独眼巨人', hp: 1500, maxHp: 1500, attack: 50, defense: 20, speed: 10,
+    expReward: 500, goldReward: 600, isBoss: true, bounty: 8000, portraitId: 'boss4',
+    statusEffects: [],
+    critRate: 0.15, critDamage: 1.7, dodgeRate: 0.05,
+    specialAbilities: [
+      { name: '巨拳打击', description: '伤害提升50%', effectType: undefined, effectChance: 0.5, damageMultiplier: 1.5 },
+      { name: '凝视冲击', description: '有45%概率造成眩晕', effectType: 'stun', effectChance: 0.45, damageMultiplier: 1.2 },
+      { name: '愤怒爆发', description: '狂暴状态，伤害提升70%', effectType: 'attackUp', effectChance: 0.3, damageMultiplier: 1.7 }
+    ]
+  },
+  { 
+    id: 'boss5', name: '变异体', hp: 1200, maxHp: 1200, attack: 40, defense: 18, speed: 18,
+    expReward: 400, goldReward: 500, isBoss: true, bounty: 1000, portraitId: 'boss5',
+    statusEffects: [],
+    critRate: 0.18, critDamage: 1.7, dodgeRate: 0.12,
+    specialAbilities: [
+      { name: '酸液喷射', description: '有70%概率造成中毒', effectType: 'poison', effectChance: 0.7, damageMultiplier: 1.3 },
+      { name: '变异触须', description: '有60%概率造成流血', effectType: 'bleed', effectChance: 0.6, damageMultiplier: 1.2 }
+    ]
+  },
+  { 
+    id: 'boss6', name: '铁血将军', hp: 2500, maxHp: 2500, attack: 65, defense: 30, speed: 14,
+    expReward: 1000, goldReward: 1500, isBoss: true, bounty: 10000, portraitId: 'boss6',
+    statusEffects: [],
+    critRate: 0.15, critDamage: 1.8, dodgeRate: 0.08,
+    specialAbilities: [
+      { name: '铁血斩击', description: '伤害提升60%', effectType: undefined, effectChance: 0.5, damageMultiplier: 1.6 },
+      { name: '将军令', description: '有60%概率造成恐惧/减速', effectType: 'slow', effectChance: 0.6, damageMultiplier: 1.3 },
+      { name: '铁血护盾', description: '提升自身防御力', effectType: 'defenseUp', effectChance: 0.4, damageMultiplier: 0.8 }
+    ]
+  },
+  { 
+    id: 'boss7', name: '大象', hp: 3000, maxHp: 3000, attack: 70, defense: 35, speed: 6,
+    expReward: 1200, goldReward: 1800, isBoss: true, bounty: 10000, portraitId: 'boss7',
+    statusEffects: [],
+    critRate: 0.1, critDamage: 1.7, dodgeRate: 0.03,
+    specialAbilities: [
+      { name: '巨象践踏', description: '有60%概率造成眩晕', effectType: 'stun', effectChance: 0.6, damageMultiplier: 1.4 },
+      { name: '象鼻横扫', description: '伤害提升50%', effectType: undefined, effectChance: 0.4, damageMultiplier: 1.5 }
+    ]
+  },
+  { 
+    id: 'boss8', name: '百足巨虫', hp: 3500, maxHp: 3500, attack: 75, defense: 40, speed: 22,
+    expReward: 1500, goldReward: 2000, isBoss: true, bounty: 32000, portraitId: 'boss8',
+    statusEffects: [],
+    critRate: 0.18, critDamage: 1.8, dodgeRate: 0.15,
+    specialAbilities: [
+      { name: '剧毒针刺', description: '有80%概率造成中毒', effectType: 'poison', effectChance: 0.8, damageMultiplier: 1.4 },
+      { name: '百足缠绕', description: '有70%概率造成减速', effectType: 'slow', effectChance: 0.7, damageMultiplier: 1.2 },
+      { name: '剧毒爆发', description: '伤害提升70%', effectType: undefined, effectChance: 0.3, damageMultiplier: 1.7 }
+    ]
+  },
+  { 
+    id: 'boss9', name: '黑风', hp: 4000, maxHp: 4000, attack: 80, defense: 45, speed: 28,
+    expReward: 2000, goldReward: 3000, isBoss: true, bounty: 50000, portraitId: 'boss9',
+    statusEffects: [],
+    critRate: 0.2, critDamage: 1.9, dodgeRate: 0.2,
+    specialAbilities: [
+      { name: '黑风横扫', description: '伤害提升70%', effectType: undefined, effectChance: 0.5, damageMultiplier: 1.7 },
+      { name: '黑暗刃', description: '有80%概率造成流血', effectType: 'bleed', effectChance: 0.8, damageMultiplier: 1.5 },
+      { name: '黑风怒号', description: '狂暴状态，伤害翻倍', effectType: 'attackUp', effectChance: 0.25, damageMultiplier: 2 }
+    ]
+  },
+  { 
+    id: 'boss10', name: '暗影首领', hp: 4500, maxHp: 4500, attack: 85, defense: 50, speed: 25,
+    expReward: 2500, goldReward: 4000, isBoss: true, bounty: 99800, portraitId: 'boss10',
+    statusEffects: [],
+    critRate: 0.22, critDamage: 2.0, dodgeRate: 0.22,
+    specialAbilities: [
+      { name: '暗影之怒', description: '伤害提升80%', effectType: undefined, effectChance: 0.5, damageMultiplier: 1.8 },
+      { name: '暗影燃烧', description: '有85%概率造成燃烧', effectType: 'burn', effectChance: 0.85, damageMultiplier: 1.5 },
+      { name: '黑暗之影', description: '100%暴击', effectType: undefined, effectChance: 0.3, damageMultiplier: 2.5 }
+    ]
+  },
+  { 
+    id: 'boss11', name: '审判者AI', hp: 10000, maxHp: 10000, attack: 100, defense: 60, speed: 16,
+    expReward: 5000, goldReward: 10000, isBoss: true, portraitId: 'boss11',
+    statusEffects: [],
+    critRate: 0.2, critDamage: 2.0, dodgeRate: 0.15,
+    specialAbilities: [
+      { name: '审判光束', description: '有70%概率造成麻痹', effectType: 'paralyze', effectChance: 0.7, damageMultiplier: 1.6 },
+      { name: '电磁脉冲', description: '有65%概率造成眩晕', effectType: 'stun', effectChance: 0.65, damageMultiplier: 1.4 },
+      { name: '系统崩溃', description: '终结攻击，伤害翻倍', effectType: undefined, effectChance: 0.25, damageMultiplier: 2 },
+      { name: 'AI强化', description: '提升自身攻击和防御', effectType: 'attackUp', effectChance: 0.35, damageMultiplier: 0.8 }
+    ]
+  }
 ];
 
 export const items: Item[] = [
@@ -297,25 +490,13 @@ export const blueprints: Blueprint[] = [
 
 export const locations: Location[] = [
   // ============ 晨风镇区域 ============
-  // 家 → 晨风镇 → 晨风镇周边 → 废弃矿洞 / 晨风镇北方
-  {
-    id: 'radom_home',
-    name: '晨风镇·家',
-    description: '你的家。',
-    type: 'town',
-    connections: [{ locationId: 'radom_town', direction: '出门' }],
-    parentTownId: 'radom',
-    enemyChance: 0,
-    treasureChance: 0,
-    eventChance: 0
-  },
+  // 晨风镇 → 晨风镇周边 → 废弃矿洞 / 晨风镇北方
   {
     id: 'radom_town',
     name: '晨风镇',
     description: '你的故乡，一个宁静的小镇。',
     type: 'town',
     connections: [
-      { locationId: 'radom_home', direction: '回家' },
       { locationId: 'radom_south', direction: '镇南门（探索）' },
       { locationId: 'radom_north', direction: '镇北门（需战车）', requirement: 'hasTank' }
     ],
@@ -324,6 +505,8 @@ export const locations: Location[] = [
     treasureChance: 0,
     eventChance: 0.1,
     buildings: [
+      { id: 'radom_home', name: '我的家', type: 'home', description: '你在晨风镇的住所', icon: '🏠' },
+      { id: 'radom_house2', name: '姐姐家', type: 'house', description: '免费休息恢复HP', icon: '🏠' },
       { id: 'radom_bar', name: '酒吧', type: 'bar', description: '可以在这里打探情报', icon: '🍺' },
       { id: 'radom_inn', name: '旅馆', type: 'inn', description: '花50金币休息恢复HP', icon: '🏨' },
       { id: 'radom_shop_human', name: '人类装备店', type: 'shop_human', description: '购买武器和防具', icon: '⚔️', itemIds: ['i1', 'i2', 'wp1', 'h1', 'ha1', 'b1', 'f1'] },
@@ -332,8 +515,6 @@ export const locations: Location[] = [
       { id: 'radom_office', name: '赏金大厅', type: 'office', description: '查看通缉犯名单，领取赏金', icon: '🎯' },
       { id: 'radom_warehouse', name: '保管处', type: 'warehouse', description: '存放多余的物品', icon: '📦' },
       { id: 'radom_house1', name: '居民房', type: 'house', description: '可以和居民交谈', icon: '🏠' },
-      { id: 'radom_house2', name: '姐姐家', type: 'house', description: '免费休息恢复HP', icon: '🏠' },
-      { id: 'radom_home', name: '我的家', type: 'home', description: '你在晨风镇的住所', icon: '🏠' },
       { id: 'radom_workshop', name: '简易工坊', type: 'workshop', description: '初级制造，只能做简单物品', icon: '🔧', itemIds: ['bp1', 'bp2', 'bp8', 'bp16', 'mat1', 'mat2', 'mat3', 'mat5'] }
     ]
   },

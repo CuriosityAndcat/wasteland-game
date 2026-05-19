@@ -3,8 +3,9 @@ import { useGameStore } from '../store/useGameStore';
 import Portrait from './Portrait';
 import NameInput from './NameInput';
 import { Item } from '../types';
+import QuestPanel from './QuestPanel';
 
-type MenuTab = 'status' | 'items' | 'tank' | 'equip' | 'ride' | 'save';
+type MenuTab = 'status' | 'items' | 'tank' | 'equip' | 'ride' | 'quest' | 'save';
 
 const tabs: { id: MenuTab; label: string; icon: string }[] = [
   { id: 'status', label: '状态', icon: '👤' },
@@ -12,6 +13,7 @@ const tabs: { id: MenuTab; label: string; icon: string }[] = [
   { id: 'tank', label: '战车', icon: '🎖️' },
   { id: 'equip', label: '装备', icon: '⚔️' },
   { id: 'ride', label: '乘降', icon: '🚗' },
+  { id: 'quest', label: '任务', icon: '📜' },
   { id: 'save', label: '存档', icon: '💾' },
 ];
 
@@ -654,6 +656,7 @@ const MenuScreen: React.FC = () => {
       case 'tank': return renderTankTab();
       case 'equip': return renderEquipTab();
       case 'ride': return renderRideTab();
+      case 'quest': return <QuestPanel />;
       case 'save': return renderSaveTab();
     }
   };

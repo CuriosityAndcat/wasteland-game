@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import Portrait from './Portrait';
 import BattleEffect from './BattleEffect';
+import { StatusEffect } from '../types';
 
 type EffectType = 'slash' | 'shoot' | 'fire' | 'explosion' | 'hit' | 'miss';
 type CurrentEffect = {
@@ -9,6 +10,21 @@ type CurrentEffect = {
   position: 'enemy' | 'player';
   visible: boolean;
 } | null;
+
+const statusEffectIcons: Record<string, { icon: string; color: string }> = {
+  poison: { icon: '☠️', color: 'text-green-400' },
+  burn: { icon: '🔥', color: 'text-orange-400' },
+  paralyze: { icon: '⚡', color: 'text-yellow-400' },
+  freeze: { icon: '❄️', color: 'text-cyan-400' },
+  stun: { icon: '💫', color: 'text-purple-400' },
+  slow: { icon: '🐌', color: 'text-blue-400' },
+  defenseUp: { icon: '🛡️', color: 'text-blue-400' },
+  defenseDown: { icon: '⬇️', color: 'text-red-400' },
+  attackUp: { icon: '⚔️', color: 'text-red-400' },
+  attackDown: { icon: '📉', color: 'text-orange-400' },
+  bleed: { icon: '🩸', color: 'text-red-500' },
+  regen: { icon: '💚', color: 'text-green-400' }
+};
 
 const BattleScreen: React.FC = () => {
   const {
@@ -27,6 +43,7 @@ const BattleScreen: React.FC = () => {
   const isBoss = enemy.isBoss;
   const currentTank = tanks[currentTankIndex];
   const recentLogs = battleLog.slice(-5);
+  const playerStatusEffects = player.statusEffects || [];
 
   const hasMainCannon = !!currentTank?.weapon;
   const hasSubCannon = !!currentTank?.subWeapon;
@@ -36,6 +53,12 @@ const BattleScreen: React.FC = () => {
   
   // 监听 battleLog 变化，根据日志内容播放特效
   useEffect(() => {
+    // 跳过首次渲染
+    if (prevLogLength === 0 && battleLog.length > 0) {
+      setPrevLogLength(battleLog.length);
+      return;
+    }
+    
     if (battleLog.length > prevLogLength && prevLogLength > 0) {
       const lastLog = battleLog[battleLog.length - 1];
       
@@ -54,14 +77,12 @@ const BattleScreen: React.FC = () => {
           } else if (lastLog.includes('副炮') || lastLog.includes('🔫')) {
             effectType = 'shoot';
           } else if (lastLog.includes('SE') || lastLog.includes('💣')) {
-            // 检查 SE 类型，如果是火焰类用 fire，否则用 explosion
             if (currentTank?.se?.id === 's2') {
               effectType = 'fire';
             } else {
               effectType = 'explosion';
             }
           } else {
-            // 普通攻击，根据装备的武器类型
             if (playerEquip.weapon) {
               const weaponId = playerEquip.weapon.id;
               if (['wp1', 'wp2'].includes(weaponId)) {
@@ -74,22 +95,43 @@ const BattleScreen: React.FC = () => {
             }
           }
         } else {
-          // 敌人攻击
           position = 'player';
           effectType = 'slash';
         }
         
-        // 播放特效
+        // 播放攻击特效
         setCurrentEffect({ type: effectType, position, visible: true });
         
-        // 一段时间后显示命中特效
+        // 300ms后显示命中特效
         setTimeout(() => {
           setCurrentEffect({ type: 'hit', position, visible: true });
           
-          // 再一段时间后清除特效
+          // 再400ms后清除特效
           setTimeout(() => {
             setCurrentEffect(null);
-          }, 500);
+          }, 400);
+        }, 300);
+      } else if (lastLog && (lastLog.includes('闪避') || lastLog.includes('💨'))) {
+        // 闪避特效
+        let position: 'enemy' | 'player' = 'player';
+        if (lastLog.includes('你闪避')) {
+          position = 'enemy';
+        }
+        setCurrentEffect({ type: 'miss', position, visible: true });
+        
+        setTimeout(() => {
+          setCurrentEffect(null);
+        }, 500);
+      } else if (lastLog && (lastLog.includes('暴击'))) {
+        // 暴击时播放爆炸特效
+        setCurrentEffect({ type: 'explosion', position: 'enemy', visible: true });
+        
+        setTimeout(() => {
+          setCurrentEffect({ type: 'hit', position: 'enemy', visible: true });
+          
+          setTimeout(() => {
+            setCurrentEffect(null);
+          }, 400);
         }, 300);
       }
     }
@@ -144,6 +186,23 @@ const BattleScreen: React.FC = () => {
                   style={{ width: `${enemyHpPercent}%` }}
                 />
               </div>
+              {enemy.statusEffects && enemy.statusEffects.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {enemy.statusEffects.map((effect) => {
+                    const effectInfo = statusEffectIcons[effect.type] || { icon: '❓', color: 'text-gray-400' };
+                    return (
+                      <div
+                        key={effect.id}
+                        className={`flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-700/50 rounded text-xs ${effectInfo.color}`}
+                        title={`${effect.name} - 剩余${effect.remainingTurns}回合`}
+                      >
+                        <span>{effectInfo.icon}</span>
+                        <span>{effect.remainingTurns}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -171,6 +230,23 @@ const BattleScreen: React.FC = () => {
                   }}
                 />
               </div>
+              {!useTank && playerStatusEffects.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {playerStatusEffects.map((effect) => {
+                    const effectInfo = statusEffectIcons[effect.type] || { icon: '❓', color: 'text-gray-400' };
+                    return (
+                      <div
+                        key={effect.id}
+                        className={`flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-700/50 rounded text-xs ${effectInfo.color}`}
+                        title={`${effect.name} - 剩余${effect.remainingTurns}回合`}
+                      >
+                        <span>{effectInfo.icon}</span>
+                        <span>{effect.remainingTurns}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -72,7 +72,7 @@ const Home: React.FC = () => {
               {gamePhase === 'shop' && <ShopScreen />}
             </div>
 
-            <div className="w-full lg:w-72 xl:w-80 flex-shrink-0">
+            <div className="w-full lg:w-72 xl:w-80 flex-shrink-0 space-y-3">
               <MessageLog />
             </div>
           </div>
