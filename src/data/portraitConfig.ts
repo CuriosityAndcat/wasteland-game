@@ -8,15 +8,14 @@ export const portraitPrompts: Record<string, string> = {
   red_wolf: '冷酷的赏金猎人',
 };
 
-// 本地头像配置（存放于 /src/assets/portraits/ 文件夹）
-// 使用AI生成的像素风头像
+// 本地头像配置（存放于 /public/portraits/ 文件夹）
 export const localPortraits: Record<string, string> = {
-  narrator: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=pixel%20art%20portrait%20of%20a%20mysterious%20hooded%20figure%20with%20glowing%20blue%20eyes%20dark%20robe%20mysterious%20storyteller%20post-apocalyptic%20game%20avatar%201%3A1&size=square',
-  father: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=pixel%20art%20portrait%20of%20a%20stern%20middle-aged%20father%20rough%20features%20tough%20expression%20work%20clothes%20post-apocalyptic%20game%20avatar%201%3A1&size=square',
-  hunter: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=pixel%20art%20portrait%20of%20a%20young%20male%20post-apocalyptic%20hunter%20leather%20jacket%20red%20bandana%20determined%20expression%20game%20avatar%201%3A1&size=square',
-  mechanic: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=pixel%20art%20portrait%20of%20a%20young%20male%20mechanic%20goggles%20friendly%20smile%20tool%20belt%20post-apocalyptic%20game%20avatar%201%3A1&size=square',
-  female_warrior: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=pixel%20art%20portrait%20of%20a%20strong%20female%20warrior%20short%20hair%20combat%20armor%20fierce%20expression%20post-apocalyptic%20game%20avatar%201%3A1&size=square',
-  red_wolf: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=pixel%20art%20portrait%20of%20a%20cool%20confident%20male%20warrior%20red%20themed%20armor%20long%20coat%20bounty%20hunter%20post-apocalyptic%20game%20avatar%201%3A1&size=square',
+  narrator: '/portraits/系统.png',
+  father: '/portraits/主角父亲.png',
+  hunter: '/portraits/主角.png',
+  mechanic: '/portraits/主角.png',
+  female_warrior: '/portraits/主角.png',
+  red_wolf: '/portraits/系统.png',
 };
 
 // 获取头像URL
