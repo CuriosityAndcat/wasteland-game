@@ -226,7 +226,8 @@ export function isUnableToAct(entity: Player | Enemy): boolean {
 /**
  * 应用回合开始时的状态效果
  */
-export function applyTurnStartEffects(entity: Player | Enemy): {
+export function applyTurnStartEffects<T extends Player | Enemy>(entity: T): {
+  entity: T;
   hpChange: number;
   messages: string[];
 } {
@@ -234,7 +235,7 @@ export function applyTurnStartEffects(entity: Player | Enemy): {
   const messages: string[] = [];
   
   if (!('statusEffects' in entity) || !entity.statusEffects) {
-    return { hpChange: 0, messages: [] };
+    return { entity: { ...entity, statusEffects: [] } as T, hpChange: 0, messages: [] };
   }
   
   const newEffects: StatusEffect[] = [];
@@ -274,46 +275,40 @@ export function applyTurnStartEffects(entity: Player | Enemy): {
     }
   });
   
-  // 更新实体的状态效果
-  (entity as any).statusEffects = newEffects;
-  
-  return { hpChange: totalHpChange, messages };
+  return { entity: { ...entity, statusEffects: newEffects } as T, hpChange: totalHpChange, messages };
 }
 
 /**
  * 添加状态效果
  */
-export function addStatusEffect(
-  entity: Player | Enemy,
+export function addStatusEffect<T extends Player | Enemy>(
+  entity: T,
   effect: StatusEffect
 ): {
+  entity: T;
   added: boolean;
   message: string;
 } {
-  if (!('statusEffects' in entity)) {
-    (entity as any).statusEffects = [];
-  }
-  
-  const effects = entity.statusEffects || [];
+  const currentEffects = ('statusEffects' in entity && entity.statusEffects) ? entity.statusEffects : [];
   
   // 检查是否已有同类效果
-  const existingIndex = effects.findIndex(e => e.type === effect.type);
+  const existingIndex = currentEffects.findIndex(e => e.type === effect.type);
   if (existingIndex !== -1) {
     // 刷新持续时间
-    effects[existingIndex] = {
-      ...effect,
-      remainingTurns: Math.max(effects[existingIndex].remainingTurns, effect.remainingTurns)
-    };
+    const newEffects = currentEffects.map((e, i) =>
+      i === existingIndex
+        ? { ...e, remainingTurns: Math.max(e.remainingTurns, effect.remainingTurns) }
+        : e
+    );
     return {
+      entity: { ...entity, statusEffects: newEffects },
       added: true,
       message: `${entity.name} 的 ${effect.name} 效果被刷新了！`
     };
   }
   
-  effects.push(effect);
-  (entity as any).statusEffects = effects;
-  
   return {
+    entity: { ...entity, statusEffects: [...currentEffects, effect] },
     added: true,
     message: `${entity.name} 陷入了 ${effect.name} 状态！`
   };
@@ -322,9 +317,12 @@ export function addStatusEffect(
 /**
  * 清除所有负面状态
  */
-export function clearNegativeEffects(entity: Player | Enemy): string[] {
+export function clearNegativeEffects<T extends Player | Enemy>(entity: T): {
+  entity: T;
+  clearedEffects: string[];
+} {
   if (!('statusEffects' in entity) || !entity.statusEffects) {
-    return [];
+    return { entity, clearedEffects: [] };
   }
   
   const negativeTypes: StatusEffectType[] = [
@@ -343,9 +341,7 @@ export function clearNegativeEffects(entity: Player | Enemy): string[] {
     }
   });
   
-  (entity as any).statusEffects = remainingEffects;
-  
-  return clearedEffects;
+  return { entity: { ...entity, statusEffects: remainingEffects } as T, clearedEffects };
 }
 
 // ==========================================

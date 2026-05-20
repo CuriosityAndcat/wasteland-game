@@ -11,7 +11,8 @@ export default function CraftingScreen() {
     closeShop,
     buyItem,
     addMessage,
-    currentBuilding
+    currentBuilding,
+    craftItem
   } = useGameStore();
 
   // 获取当前建筑可购买的物品ID列表
@@ -35,38 +36,7 @@ export default function CraftingScreen() {
   };
 
   const handleCraft = (bpId: string) => {
-    const blueprint = blueprints.find(b => b.id === bpId);
-    if (!blueprint) return;
-
-    if (!canCraft(bpId)) {
-      addMessage('材料不足，无法制造！');
-      return;
-    }
-
-    const newInventory = [...inventory];
-    blueprint.materials.forEach(mat => {
-      const idx = newInventory.findIndex(i => i.item.id === mat.itemId);
-      if (idx !== -1) {
-        newInventory[idx] = { ...newInventory[idx], quantity: newInventory[idx].quantity - mat.quantity };
-        if (newInventory[idx].quantity <= 0) {
-          newInventory.splice(idx, 1);
-        }
-      }
-    });
-
-    const resultItem = items.find(i => i.id === blueprint.craftResult.itemId);
-    if (resultItem) {
-      const existingResult = newInventory.find(i => i.item.id === resultItem.id);
-      if (existingResult) {
-        const resultIdx = newInventory.findIndex(i => i.item.id === resultItem.id);
-        newInventory[resultIdx] = { ...existingResult, quantity: existingResult.quantity + blueprint.craftResult.quantity };
-      } else {
-        newInventory.push({ item: resultItem, quantity: blueprint.craftResult.quantity });
-      }
-    }
-
-    useGameStore.setState({ inventory: newInventory });
-    addMessage(`成功制造了${blueprint.name}的产物！`);
+    craftItem(bpId);
   };
 
   const handleBuyBlueprint = (bpId: string) => {

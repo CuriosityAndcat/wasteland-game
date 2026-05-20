@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { getPortraitUrl } from '../data/portraitConfig';
 
 interface PortraitProps {
   id: string;
@@ -14,8 +15,10 @@ const sizeMap = {
 };
 
 const Portrait: React.FC<PortraitProps> = ({ id, size = 'md', className = '' }) => {
+  const [imgError, setImgError] = useState(false);
+  const localUrl = getPortraitUrl(id);
 
-  const renderAvatar = () => {
+  const renderSvgFallback = () => {
     switch (id) {
       case 'narrator':
         return (
@@ -145,9 +148,22 @@ const Portrait: React.FC<PortraitProps> = ({ id, size = 'md', className = '' }) 
     }
   };
 
+  if (localUrl && !imgError) {
+    return (
+      <div className={`${sizeMap[size]} rounded-full overflow-hidden border-2 border-gray-600 bg-gray-800 flex-shrink-0 ${className}`}>
+        <img
+          src={localUrl}
+          alt={id}
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`${sizeMap[size]} rounded-full overflow-hidden border-2 border-gray-600 bg-gray-800 flex-shrink-0 ${className}`}>
-      {renderAvatar()}
+      {renderSvgFallback()}
     </div>
   );
 };

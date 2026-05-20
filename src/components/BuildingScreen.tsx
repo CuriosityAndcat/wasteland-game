@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { Building } from '../types';
 import { quests as allQuests } from '../data/quests';
+import { items } from '../data/gameData';
+import Portrait from './Portrait';
 
 const barNpcs: Record<string, { name: string; dialogs: string[] }[]> = {
   radom_bar: [
@@ -315,7 +317,9 @@ const BuildingScreen: React.FC = () => {
     setStoryFlags,
     openCrafting,
     addQuest,
-    quests
+    quests,
+    activeDialog,
+    nextDialog
   } = useGameStore();
 
   const [selectedNpc, setSelectedNpc] = useState<number | null>(null);
@@ -1031,7 +1035,10 @@ const BuildingScreen: React.FC = () => {
             <p className="text-amber-300 text-sm font-bold">🏠 {building.name}</p>
           </div>
           <div className="bg-amber-800/60 rounded-lg p-4">
-            <p className="text-amber-300 text-sm font-bold mb-2">👤 父亲</p>
+            <div className="flex items-center gap-3 mb-3">
+              <Portrait id="father" size="sm" />
+              <p className="text-amber-300 text-sm font-bold">👤 父亲</p>
+            </div>
             <p className="text-amber-200/90 text-sm leading-relaxed mb-4">
               {fatherDialogs[fatherDialogStep]}
             </p>
@@ -1054,7 +1061,7 @@ const BuildingScreen: React.FC = () => {
         </div>
         <div className="bg-amber-800/40 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-full bg-amber-900 flex items-center justify-center text-2xl">👨</div>
+            <Portrait id="father" size="sm" />
             <div className="flex-1">
               <p className="text-amber-300 text-sm font-bold">👤 父亲</p>
               <p className="text-amber-200/70 text-xs">"又是你...有什么事？"</p>
@@ -1352,27 +1359,52 @@ const BuildingScreen: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-[400px] rounded-xl border-2 ${getBuildingInteriorStyle()} p-4`}>
-      <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{getBuildingIcon()}</span>
-          <div>
-            <h2 className="text-white font-bold text-base">{building.name}</h2>
-            <p className="text-white/50 text-xs">{currentLoc?.name}</p>
+    <>
+      {activeDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-gray-900 border-2 border-yellow-500 rounded-xl shadow-2xl w-full max-w-lg mx-4">
+            <div className="bg-gray-800 px-4 py-3 border-b border-yellow-500/50 flex items-center gap-3">
+              <Portrait id={activeDialog.speaker === '系统' ? 'npc' : activeDialog.speaker} size="sm" />
+              <span className="text-yellow-400 font-bold text-sm">{activeDialog.speaker}</span>
+            </div>
+            <div className="p-6 min-h-[120px] flex items-center justify-center">
+              <p className="text-gray-100 text-base leading-relaxed text-center whitespace-pre-line">
+                {activeDialog.content}
+              </p>
+            </div>
+            <div className="bg-gray-800 px-4 py-3 border-t border-yellow-500/50 flex justify-center">
+              <button
+                onClick={nextDialog}
+                className="px-8 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg font-bold text-sm transition-all"
+              >
+                继续
+              </button>
+            </div>
           </div>
         </div>
-        <button
-          onClick={handleBack}
-          className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-all"
-        >
-          🚪 离开
-        </button>
-      </div>
+      )}
+      <div className={`min-h-[400px] rounded-xl border-2 ${getBuildingInteriorStyle()} p-4`}>
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{getBuildingIcon()}</span>
+            <div>
+              <h2 className="text-white font-bold text-base">{building.name}</h2>
+              <p className="text-white/50 text-xs">{currentLoc?.name}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleBack}
+            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-1.5 rounded-lg text-xs font-medium transition-all"
+          >
+            🚪 离开
+          </button>
+        </div>
 
-      <div className="min-h-[200px]">
-        {showContent === 'main' ? renderMainContent() : renderDialogContent()}
+        <div className="min-h-[200px]">
+          {showContent === 'main' ? renderMainContent() : renderDialogContent()}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

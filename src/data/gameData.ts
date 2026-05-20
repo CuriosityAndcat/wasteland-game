@@ -2,7 +2,7 @@ import { Enemy, Item, Location, Blueprint } from '../types';
 
 export const enemies: Enemy[] = [
   { 
-    id: 'e1', name: '巨蚁', hp: 10, maxHp: 10, attack: 8, defense: 3, speed: 8,
+    id: 'enemy_1', name: '巨蚁', hp: 10, maxHp: 10, attack: 8, defense: 3, speed: 8,
     expReward: 5, goldReward: 5, portraitId: 'e1',
     statusEffects: [],
     critRate: 0.05, critDamage: 1.3, dodgeRate: 0.05,
@@ -11,7 +11,7 @@ export const enemies: Enemy[] = [
     ]
   },
   { 
-    id: 'e3', name: '杀人虫', hp: 16, maxHp: 16, attack: 16, defense: 5, speed: 12,
+    id: 'enemy_3', name: '杀人虫', hp: 16, maxHp: 16, attack: 16, defense: 5, speed: 12,
     expReward: 12, goldReward: 12, portraitId: 'e3',
     statusEffects: [],
     critRate: 0.08, critDamage: 1.4, dodgeRate: 0.08,
@@ -20,7 +20,7 @@ export const enemies: Enemy[] = [
     ]
   },
   { 
-    id: 'e4', name: '仿生蜗牛', hp: 20, maxHp: 20, attack: 22, defense: 10, speed: 5,
+    id: 'enemy_4', name: '仿生蜗牛', hp: 20, maxHp: 20, attack: 22, defense: 10, speed: 5,
     expReward: 15, goldReward: 18, portraitId: 'e4',
     statusEffects: [],
     critRate: 0.05, critDamage: 1.3, dodgeRate: 0.03,
@@ -29,7 +29,7 @@ export const enemies: Enemy[] = [
     ]
   },
   { 
-    id: 'e5', name: '蜈蚣', hp: 20, maxHp: 20, attack: 20, defense: 7, speed: 15,
+    id: 'enemy_5', name: '蜈蚣', hp: 20, maxHp: 20, attack: 20, defense: 7, speed: 15,
     expReward: 15, goldReward: 15, portraitId: 'e5',
     statusEffects: [],
     critRate: 0.1, critDamage: 1.4, dodgeRate: 0.1,
@@ -38,7 +38,7 @@ export const enemies: Enemy[] = [
     ]
   },
   { 
-    id: 'e6', name: '蝎子', hp: 25, maxHp: 25, attack: 22, defense: 8, speed: 10,
+    id: 'enemy_6', name: '蝎子', hp: 25, maxHp: 25, attack: 22, defense: 8, speed: 10,
     expReward: 18, goldReward: 18, portraitId: 'e6',
     statusEffects: [],
     critRate: 0.12, critDamage: 1.5, dodgeRate: 0.08,
@@ -48,7 +48,7 @@ export const enemies: Enemy[] = [
     ]
   },
   { 
-    id: 'e7', name: '机器人', hp: 35, maxHp: 35, attack: 26, defense: 10, speed: 12,
+    id: 'enemy_7', name: '机器人', hp: 35, maxHp: 35, attack: 26, defense: 10, speed: 12,
     expReward: 25, goldReward: 25, portraitId: 'e7',
     statusEffects: [],
     critRate: 0.08, critDamage: 1.4, dodgeRate: 0.06,
@@ -57,7 +57,7 @@ export const enemies: Enemy[] = [
     ]
   },
   { 
-    id: 'e8', name: '变异鼠', hp: 30, maxHp: 30, attack: 24, defense: 9, speed: 18,
+    id: 'enemy_8', name: '变异鼠', hp: 30, maxHp: 30, attack: 24, defense: 9, speed: 18,
     expReward: 22, goldReward: 22, portraitId: 'e8',
     statusEffects: [],
     critRate: 0.15, critDamage: 1.6, dodgeRate: 0.15,
@@ -66,7 +66,7 @@ export const enemies: Enemy[] = [
     ]
   },
   { 
-    id: 'e9', name: '强化兵', hp: 45, maxHp: 45, attack: 32, defense: 12, speed: 14,
+    id: 'enemy_9', name: '强化兵', hp: 45, maxHp: 45, attack: 32, defense: 12, speed: 14,
     expReward: 35, goldReward: 35, portraitId: 'e9',
     statusEffects: [],
     critRate: 0.1, critDamage: 1.5, dodgeRate: 0.08,
@@ -76,7 +76,7 @@ export const enemies: Enemy[] = [
     ]
   },
   { 
-    id: 'e10', name: '铁甲兵', hp: 55, maxHp: 55, attack: 36, defense: 15, speed: 10,
+    id: 'enemy_10', name: '铁甲兵', hp: 55, maxHp: 55, attack: 36, defense: 15, speed: 10,
     expReward: 45, goldReward: 45, portraitId: 'e10',
     statusEffects: [],
     critRate: 0.08, critDamage: 1.4, dodgeRate: 0.05,
@@ -531,7 +531,7 @@ export const locations: Location[] = [
     enemyChance: 0.4,
     treasureChance: 0.1,
     eventChance: 0.1,
-    enemyIds: ['e1', 'e3', 'e4']
+    enemyIds: ['enemy_1', 'enemy_3', 'enemy_4']
   },
   {
     id: 'radom_cave_1f',
@@ -546,7 +546,7 @@ export const locations: Location[] = [
     enemyChance: 0.4,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e5', 'e6']
+    enemyIds: ['enemy_5', 'enemy_6']
   },
   {
     id: 'radom_cave_2f',
@@ -577,7 +577,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.15,
     eventChance: 0.1,
-    enemyIds: ['e5', 'e6']
+    enemyIds: ['enemy_5', 'enemy_6']
   },
   {
     id: 'water_cave',
@@ -647,7 +647,7 @@ export const locations: Location[] = [
     enemyChance: 0.4,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e3', 'e5', 'e6']
+    enemyIds: ['enemy_3', 'enemy_5', 'enemy_6']
   },
 
   // ============ 绿洲镇区域 ============
@@ -692,7 +692,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e6', 'e7', 'e8']
+    enemyIds: ['enemy_6', 'enemy_7', 'enemy_8']
   },
   {
     id: 'factory',
@@ -777,7 +777,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e7', 'e8']
+    enemyIds: ['enemy_7', 'enemy_8']
   },
 
   // ============ 铁锚港区域 ============
@@ -861,7 +861,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e7', 'e8']
+    enemyIds: ['enemy_7', 'enemy_8']
   },
   {
     id: 'hospital',
@@ -917,7 +917,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e7', 'e8']
+    enemyIds: ['enemy_7', 'enemy_8']
   },
   {
     id: 'free_building',
@@ -972,7 +972,7 @@ export const locations: Location[] = [
     enemyChance: 0.4,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e7', 'e8']
+    enemyIds: ['enemy_7', 'enemy_8']
   },
 
   // ============ 静寂村区域 ============
@@ -1014,7 +1014,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e7', 'e8']
+    enemyIds: ['enemy_7', 'enemy_8']
   },
 
   // ============ 日耀镇区域 ============
@@ -1057,7 +1057,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e7', 'e8']
+    enemyIds: ['enemy_7', 'enemy_8']
   },
   {
     id: 'sewer',
@@ -1111,7 +1111,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e7', 'e8']
+    enemyIds: ['enemy_7', 'enemy_8']
   },
   {
     id: 'tower',
@@ -1166,7 +1166,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e7', 'e8']
+    enemyIds: ['enemy_7', 'enemy_8']
   },
   {
     id: 'waterfall',
@@ -1222,7 +1222,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['e7', 'e8']
+    enemyIds: ['enemy_7', 'enemy_8']
   },
   {
     id: 'arsenal',

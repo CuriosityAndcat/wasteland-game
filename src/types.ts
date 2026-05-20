@@ -257,7 +257,6 @@ export interface GameState {
   storage: InventoryItem[];
   warehouseItems: InventoryItem[];
   blueprints: string[];
-  gold: number;
   currentLocationId: string;
   currentBuildingId?: string | null;
   gamePhase: 'title' | 'intro' | 'dialog' | 'town' | 'explore' | 'battle' | 'shop' | 'inventory' | 'tankSelect' | 'menu' | 'building' | 'crafting';
@@ -269,8 +268,9 @@ export interface GameState {
     enemy: Enemy;
     turn: 'player' | 'enemy';
     useTank: boolean;
+    isProcessing?: boolean;
   };
-  messages: { id: number; text: string }[];
+  messages: { id: string; text: string }[];
   battleLog: string[];
   locations: Location[];
   shopItems: Item[];
@@ -284,6 +284,8 @@ export interface GameState {
   };
   storyFlags: StoryFlags;
   currentDialogId?: string;
+  dialogQueue: Dialog[];
+  activeDialog: Dialog | null;
   quests: {
     available: Quest[];
     inProgress: Quest[];

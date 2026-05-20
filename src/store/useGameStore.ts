@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { GameState, Player, Tank, Item, Enemy, InventoryItem, Building } from '../types';
+import { GameState, Player, Tank, Item, Enemy, InventoryItem, Building, Dialog, StoryFlags } from '../types';
 import { enemies, items, locations, characters, tankModels, blueprints } from '../data/gameData';
 import { quests } from '../data/quests';
+import { dialogs, getDialogById, getDialogsByLocation } from '../data/dialogs';
 import {
   calculateDamage,
   calculateExpForLevel,
@@ -92,20 +93,42 @@ function handleEnemyDefeated(get: any, set: any, enemy: Enemy, player: Player, u
   }));
 }
 
-function processEnemyCounterAttack(get: any, set: any) {
+function scheduleEnemyAttack(get: any, set: any, isDefending?: boolean) {
+  const state = get();
+  if (!state.battle) return;
+  set({ battle: { ...state.battle, isProcessing: true } });
+  setTimeout(() => processEnemyCounterAttack(get, set, isDefending), 1500);
+}
+
+function processEnemyCounterAttack(get: any, set: any, isDefending?: boolean) {
   const currentState = get();
   if (!currentState.battle) return;
   
-  const { enemy } = currentState.battle;
+  let { enemy } = currentState.battle;
+  
+  // 防御状态提升50%防御力
+  let defenseBonus = 0;
+  if (isDefending) {
+    if (currentState.battle.useTank) {
+      const tank = currentState.tanks[currentState.currentTankIndex];
+      defenseBonus = Math.floor((tank.defense + (tank.engine?.value || 0) + (tank.cDevice?.value || 0) + (currentState.player.drivingLevel || 1) * 1) * 0.5);
+    } else {
+      defenseBonus = Math.floor(((currentState.playerEquip.head?.value || 0) +
+        (currentState.playerEquip.body?.value || 0) +
+        (currentState.playerEquip.hand?.value || 0) +
+        (currentState.playerEquip.foot?.value || 0)) * 0.5);
+    }
+  }
   
   // 计算角色的有效防御力（包含装备加成和状态效果）
-  const effectivePlayer = {
+  let effectivePlayer = {
     ...currentState.player,
     defense: currentState.player.defense + 
       (currentState.playerEquip.head?.value || 0) + 
       (currentState.playerEquip.body?.value || 0) + 
       (currentState.playerEquip.hand?.value || 0) + 
-      (currentState.playerEquip.foot?.value || 0),
+      (currentState.playerEquip.foot?.value || 0) +
+      defenseBonus,
     statusEffects: currentState.player.statusEffects || []
   };
   
@@ -121,23 +144,47 @@ function processEnemyCounterAttack(get: any, set: any) {
     
     // 仍然切换回玩家回合
     set({
-      battle: { ...currentState.battle, turn: 'player' }
+      battle: { ...currentState.battle, turn: 'player', isProcessing: false }
     });
     return;
   }
   
   // 应用回合开始时的状态效果
-  const turnStartEffects = applyTurnStartEffects(effectivePlayer);
+  const { entity: updatedPlayer, hpChange, messages: effectMessages } = applyTurnStartEffects(effectivePlayer);
+  effectivePlayer = updatedPlayer as Player;
   let finalDamage = 0;
   
-  turnStartEffects.messages.forEach(msg => {
+  effectMessages.forEach(msg => {
     get().addBattleMessage(msg);
   });
   
+  // 处理敌人身上的回合开始效果（中毒/燃烧/流血等DOT伤害）
+  if (enemy.statusEffects && enemy.statusEffects.length > 0) {
+    const enemyDOTEntity = { ...enemy, statusEffects: [...enemy.statusEffects] };
+    const { hpChange: enemyHpChange, messages: enemyEffectMessages } = applyTurnStartEffects(enemyDOTEntity);
+    
+    enemyEffectMessages.forEach(msg => {
+      get().addBattleMessage(msg);
+    });
+    
+    if (enemyHpChange !== 0) {
+      const newEnemyHp = Math.max(0, enemy.hp + enemyHpChange);
+      
+      if (newEnemyHp <= 0) {
+        handleEnemyDefeated(get, set, { ...enemyDOTEntity, hp: newEnemyHp } as Enemy, currentState.player, currentState.battle.useTank);
+        return;
+      }
+      
+      enemy = { ...enemyDOTEntity, hp: Math.min(enemy.maxHp, newEnemyHp) };
+    } else {
+      enemy = { ...enemyDOTEntity };
+    }
+  }
+  
   // 检查是否有立即生效的伤害
-  if (turnStartEffects.hpChange < 0) {
-    const newHp = Math.max(0, effectivePlayer.hp + turnStartEffects.hpChange);
-    effectivePlayer.hp = newHp;
+  if (hpChange < 0) {
+    const newHp = Math.max(0, effectivePlayer.hp + hpChange);
+    effectivePlayer = { ...effectivePlayer, hp: newHp };
     
     if (newHp <= 0) {
       set({
@@ -153,9 +200,9 @@ function processEnemyCounterAttack(get: any, set: any) {
           player: { 
             ...state.player, 
             hp: Math.floor(state.player.maxHp / 2),
-            statusEffects: []
-          },
-          gold: Math.floor(state.player.gold * 0.9)
+            statusEffects: [],
+            gold: Math.floor(state.player.gold * 0.9)
+          }
         }));
       }, 100);
       return;
@@ -176,9 +223,10 @@ function processEnemyCounterAttack(get: any, set: any) {
     if (ability.effectType && ability.effectChance && Math.random() < ability.effectChance) {
       const effect = createStatusEffect(ability.effectType, 3);
       if (!currentState.battle.useTank) {
-        const result = addStatusEffect(effectivePlayer, effect);
+        const { entity: updatedEntity, message } = addStatusEffect(effectivePlayer, effect);
+        effectivePlayer = updatedEntity as Player;
         appliedEffects.push(effect);
-        get().addBattleMessage(result.message);
+        get().addBattleMessage(message);
       }
     }
   } else {
@@ -215,12 +263,12 @@ function processEnemyCounterAttack(get: any, set: any) {
       get().addBattleMessage('⚠️ 战车装甲被击毁了！');
       set({
         tanks: updatedTanks,
-        battle: { ...currentState.battle, useTank: false, turn: 'player' }
+        battle: { ...currentState.battle, enemy, useTank: false, turn: 'player', isProcessing: false }
       });
     } else {
       set({
         tanks: updatedTanks,
-        battle: { ...currentState.battle, turn: 'player' }
+        battle: { ...currentState.battle, enemy, turn: 'player', isProcessing: false }
       });
     }
   } else {
@@ -256,9 +304,9 @@ function processEnemyCounterAttack(get: any, set: any) {
           player: { 
             ...state.player, 
             hp: Math.floor(state.player.maxHp / 2),
-            statusEffects: []
-          },
-          gold: Math.floor(state.player.gold * 0.9)
+            statusEffects: [],
+            gold: Math.floor(state.player.gold * 0.9)
+          }
         }));
       }, 100);
     } else {
@@ -269,7 +317,7 @@ function processEnemyCounterAttack(get: any, set: any) {
           hp: newPlayerHp,
           statusEffects: effectivePlayer.statusEffects 
         },
-        battle: { ...currentState.battle, turn: 'player' }
+        battle: { ...currentState.battle, enemy, turn: 'player', isProcessing: false }
       });
     }
   }
@@ -351,11 +399,20 @@ type GameStoreActions = {
   learnBlueprint: (blueprintId: string) => void;
   openCrafting: () => void;
   closeCrafting: () => void;
+  craftItem: (blueprintId: string) => void;
+  setInventory: (inventory: InventoryItem[]) => void;
+  setStoryFlags: (flags: StoryFlags) => void;
   addQuest: (questId: string) => void;
   updateQuestObjective: (questId: string, objectiveId: string, progress: number) => void;
   completeQuest: (questId: string) => void;
   triggerEffect: (type: string, position: 'enemy' | 'player') => void;
+  startDialogChain: (dialogId: string) => void;
+  nextDialog: () => void;
+  checkDialogCondition: (condition: string) => boolean;
+  processDialogAction: (action: string) => void;
 };
+
+let messageCounter = 0;
 
 export const useGameStore = create<GameState & GameStoreActions>((set, get) => ({
   player: initialPlayer,
@@ -381,6 +438,8 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
   locations: locations,
   shopItems: [],
   currentDialogId: undefined,
+  dialogQueue: [],
+  activeDialog: null,
   quests: {
     available: [],
     inProgress: [],
@@ -427,7 +486,6 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       inventory: initialInventory,
       storage: [],
       warehouseItems: [],
-      gold: 50,
       playerEquip: { head: undefined, body: undefined, hand: undefined, foot: undefined, weapon: undefined },
       messages: [],
       battle: undefined,
@@ -490,8 +548,9 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
   },
 
   addMessage: (message: string) => {
+    messageCounter++;
     set(state => ({
-      messages: [...state.messages.slice(-49), { id: Date.now(), text: message }]
+      messages: [...state.messages.slice(-49), { id: `${Date.now()}_${messageCounter}`, text: message }]
     }));
   },
 
@@ -535,6 +594,26 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
         get().addMessage(`这里已经安全了，${boss.name}已经被击败。`);
       }
     }
+
+    const locationDialogs = dialogs.filter(d => {
+      if (!d.locationId) return false;
+      return locationId.startsWith(d.locationId) || d.locationId === locationId;
+    });
+
+    if (locationDialogs.length > 0) {
+      const eligibleDialogs = locationDialogs.filter(d => {
+        if (d.triggerCondition) {
+          return get().checkDialogCondition(d.triggerCondition);
+        }
+        return true;
+      });
+
+      if (eligibleDialogs.length > 0) {
+        const firstDialog = eligibleDialogs[0];
+        get().startDialogChain(firstDialog.id);
+        return;
+      }
+    }
   },
 
   startBattle: (enemy?: Enemy) => {
@@ -568,6 +647,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
   attack: () => {
     const state = get();
     if (!state.battle) return;
+    if (state.battle.isProcessing) return;
 
     const { enemy } = state.battle;
     if (state.battle.useTank) return;
@@ -607,13 +687,13 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       handleEnemyDefeated(get, set, enemy, state.player);
     } else {
       set({ battle: { ...state.battle, enemy: newEnemy, turn: 'enemy' } });
-      setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+      scheduleEnemyAttack(get, set);
     }
   },
 
   mainCannonAttack: () => {
     const state = get();
-    if (!state.battle || !state.battle.useTank) return;
+    if (!state.battle || state.battle.isProcessing || !state.battle.useTank) return;
 
     const { enemy } = state.battle;
     const tank = state.tanks[state.currentTankIndex];
@@ -621,35 +701,31 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       get().addBattleMessage('⚠️ 没有装备主炮！');
       return;
     }
-    if (!tank.mainCannonAmmo || tank.mainCannonAmmo <= 0) {
-      get().addBattleMessage('⚠️ 主炮弹药不足！');
-      return;
+
+    const mainCannonDamage = tank.attack + tank.weapon.value;
+    const damageResult = calculateDamage({ ...state.player, attack: mainCannonDamage }, enemy);
+
+    let newEnemy = { ...enemy, hp: Math.max(0, enemy.hp - (damageResult.finalDamage || 0)) };
+
+    if (damageResult.isDodged || !damageResult.isHit) {
+      get().addBattleMessage(`💨 ${enemy.name} 闪避了主炮攻击！`);
+    } else if (damageResult.isCrit) {
+      get().addBattleMessage(`💥 暴击！主炮对${enemy.name}造成了 ${damageResult.finalDamage} 点伤害！`);
+    } else {
+      get().addBattleMessage(`💣 主炮攻击！对${enemy.name}造成了 ${damageResult.finalDamage} 点伤害！`);
     }
-
-    const attackPower = tank.attack + tank.weapon.value + (state.player.drivingLevel || 1) * 2;
-    const damage = Math.max(1, attackPower - enemy.defense + Math.floor(Math.random() * 6));
-    const newEnemy = { ...enemy, hp: Math.max(0, enemy.hp - damage) };
-
-    const updatedTanks = [...state.tanks];
-    updatedTanks[state.currentTankIndex] = {
-      ...tank,
-      mainCannonAmmo: tank.mainCannonAmmo - 1
-    };
-
-    get().addBattleMessage(`💥 主炮「${tank.weapon.name}」对${enemy.name}造成了 ${damage} 点伤害！`);
-    get().addBattleMessage(`📦 主炮弹药剩余: ${tank.mainCannonAmmo - 1}发`);
 
     if (newEnemy.hp <= 0) {
       handleEnemyDefeated(get, set, enemy, state.player, true);
     } else {
-      set({ tanks: updatedTanks, battle: { ...state.battle, enemy: newEnemy, turn: 'enemy' } });
-      setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+      set({ battle: { ...state.battle, enemy: newEnemy, turn: 'enemy' } });
+      scheduleEnemyAttack(get, set);
     }
   },
 
   subCannonAttack: () => {
     const state = get();
-    if (!state.battle || !state.battle.useTank) return;
+    if (!state.battle || state.battle.isProcessing || !state.battle.useTank) return;
 
     const { enemy } = state.battle;
     const tank = state.tanks[state.currentTankIndex];
@@ -658,28 +734,30 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       return;
     }
 
-    const hits = Math.random() < 0.6 ? 2 : 1;
-    let totalDamage = 0;
-    for (let i = 0; i < hits; i++) {
-      const hitDmg = Math.max(1, tank.attack + tank.subWeapon.value + (state.player.drivingLevel || 1) * 2 - enemy.defense + Math.floor(Math.random() * 4));
-      totalDamage += hitDmg;
+    const subCannonDamage = tank.attack + tank.subWeapon.value;
+    const damageResult = calculateDamage({ ...state.player, attack: subCannonDamage }, enemy);
+
+    let newEnemy = { ...enemy, hp: Math.max(0, enemy.hp - (damageResult.finalDamage || 0)) };
+
+    if (damageResult.isDodged || !damageResult.isHit) {
+      get().addBattleMessage(`💨 ${enemy.name} 闪避了副炮攻击！`);
+    } else if (damageResult.isCrit) {
+      get().addBattleMessage(`💥 暴击！副炮对${enemy.name}造成了 ${damageResult.finalDamage} 点伤害！`);
+    } else {
+      get().addBattleMessage(`💣 副炮攻击！对${enemy.name}造成了 ${damageResult.finalDamage} 点伤害！`);
     }
-
-    const newEnemy = { ...enemy, hp: Math.max(0, enemy.hp - totalDamage) };
-
-    get().addBattleMessage(`🔫 副炮「${tank.subWeapon.name}」连续射击 ${hits} 次，共造成 ${totalDamage} 点伤害！`);
 
     if (newEnemy.hp <= 0) {
       handleEnemyDefeated(get, set, enemy, state.player, true);
     } else {
       set({ battle: { ...state.battle, enemy: newEnemy, turn: 'enemy' } });
-      setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+      scheduleEnemyAttack(get, set);
     }
   },
 
   seAttack: () => {
     const state = get();
-    if (!state.battle || !state.battle.useTank) return;
+    if (!state.battle || state.battle.isProcessing || !state.battle.useTank) return;
 
     const { enemy } = state.battle;
     const tank = state.tanks[state.currentTankIndex];
@@ -687,35 +765,31 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       get().addBattleMessage('⚠️ 没有装备SE！');
       return;
     }
-    if (!tank.seAmmo || tank.seAmmo <= 0) {
-      get().addBattleMessage('⚠️ SE弹药不足！');
-      return;
+
+    const seDamage = tank.attack + tank.se.value * 2;
+    const damageResult = calculateDamage({ ...state.player, attack: seDamage }, enemy);
+
+    let newEnemy = { ...enemy, hp: Math.max(0, enemy.hp - (damageResult.finalDamage || 0)) };
+
+    if (damageResult.isDodged || !damageResult.isHit) {
+      get().addBattleMessage(`💨 ${enemy.name} 闪避了SE攻击！`);
+    } else if (damageResult.isCrit) {
+      get().addBattleMessage(`💥 暴击！SE对${enemy.name}造成了 ${damageResult.finalDamage} 点伤害！`);
+    } else {
+      get().addBattleMessage(`💣 SE攻击！对${enemy.name}造成了 ${damageResult.finalDamage} 点伤害！`);
     }
-
-    const attackPower = tank.attack + tank.se.value * 2 + (state.player.drivingLevel || 1) * 2;
-    const damage = Math.max(1, attackPower - enemy.defense + Math.floor(Math.random() * 10));
-    const newEnemy = { ...enemy, hp: Math.max(0, enemy.hp - damage) };
-
-    const updatedTanks = [...state.tanks];
-    updatedTanks[state.currentTankIndex] = {
-      ...tank,
-      seAmmo: tank.seAmmo - 1
-    };
-
-    get().addBattleMessage(`💣 SE「${tank.se.name}」对${enemy.name}造成了 ${damage} 点伤害！`);
-    get().addBattleMessage(`📦 SE弹药剩余: ${tank.seAmmo - 1}发`);
 
     if (newEnemy.hp <= 0) {
       handleEnemyDefeated(get, set, enemy, state.player, true);
     } else {
-      set({ tanks: updatedTanks, battle: { ...state.battle, enemy: newEnemy, turn: 'enemy' } });
-      setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+      set({ battle: { ...state.battle, enemy: newEnemy, turn: 'enemy' } });
+      scheduleEnemyAttack(get, set);
     }
   },
 
   defend: () => {
     const state = get();
-    if (!state.battle) return;
+    if (!state.battle || state.battle.isProcessing) return;
 
     const { enemy } = state.battle;
     const useTank = state.battle.useTank;
@@ -739,56 +813,14 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
     get().addBattleMessage(`🛡️ ${state.player.name}进入防御姿态！防御力提升！`);
 
     if (enemy.hp > 0) {
-      // 使用新的伤害计算系统，防御时传入 isDefending = true
-      const damageResult = calculateDamage(enemy, { ...state.player, defense: effectiveDefense }, true);
-      
-      if (!damageResult.isHit || damageResult.isDodged) {
-        get().addBattleMessage(`💨 ${useTank ? '战车' : state.player.name}闪避了攻击！`);
-        get().triggerEffect('miss', 'enemy');
-      } else {
-        get().addBattleMessage(`💥 ${enemy.name}的攻击造成了 ${damageResult.finalDamage} 点伤害！（防御减半）`);
-        
-        if (useTank) {
-          const currentTank = state.tanks[state.currentTankIndex];
-          const newArmor = Math.max(0, currentTank.armor - damageResult.finalDamage);
-          const updatedTanks = [...state.tanks];
-          updatedTanks[state.currentTankIndex] = { ...currentTank, armor: newArmor };
-          
-          let newBattleState = { ...state.battle!, turn: 'enemy' as const };
-          
-          if (newArmor <= 0) {
-            get().addBattleMessage('⚠️ 战车装甲被击毁了！');
-            newBattleState = { ...newBattleState, useTank: false };
-          }
-          
-          set({ tanks: updatedTanks, battle: newBattleState });
-        } else {
-          const newHp = Math.max(0, state.player.hp - damageResult.finalDamage);
-          
-          if (newHp <= 0) {
-            get().addBattleMessage(`💀 ${state.player.name}被击败了...`);
-            set({ 
-              player: { ...state.player, hp: 0, statusEffects: [] },
-              gamePhase: 'explore', 
-              battle: undefined, 
-              battleLog: [] 
-            });
-            return;
-          }
-          
-          set({
-            player: { ...state.player, hp: newHp },
-            battle: { ...state.battle, turn: 'enemy' }
-          });
-        }
-      }
-      
-      setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+      scheduleEnemyAttack(get, set, true);
     }
   },
 
   useItem: (item: Item) => {
     const state = get();
+    
+    if (state.gamePhase === 'battle' && state.battle?.isProcessing) return;
     
     const inventoryItem = state.inventory.find(i => i.item.id === item.id);
     if (!inventoryItem || inventoryItem.quantity <= 0) {
@@ -814,7 +846,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
           get().addBattleMessage(`💊 使用了${item.name}，恢复了 ${item.value} HP！`);
           // 战斗中使用后轮到敌人
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           get().addMessage(`💊 使用了${item.name}，恢复了 ${item.value} HP！`);
         }
@@ -851,7 +883,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
             return;
           }
           
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           set({
             inventory: state.inventory.map(i => 
@@ -889,7 +921,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
             return;
           }
           
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           set({
             inventory: state.inventory.map(i => 
@@ -919,17 +951,17 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
           get().addBattleMessage(`🔧 使用了${item.name}，恢复了 ${item.value} 装甲！`);
           // 战斗中使用后轮到敌人
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           get().addMessage(`🔧 使用了${item.name}，恢复了 ${item.value} 装甲！`);
         }
       } else if (item.id === 'i5') {
         // 解药 - 清除中毒状态
         if (state.player.statusEffects && state.player.statusEffects.length > 0) {
-          const clearedEffects = clearNegativeEffects(state.player);
+          const { entity: clearedPlayer, clearedEffects } = clearNegativeEffects(state.player);
           if (clearedEffects.length > 0) {
             set({
-              player: { ...state.player, statusEffects: state.player.statusEffects },
+              player: clearedPlayer,
               inventory: state.inventory.map(i => 
                 i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
               ).filter(i => i.quantity > 0)
@@ -944,7 +976,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
         
         if (isInBattle) {
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         }
       } else if (item.id === 'i6') {
         // 烟幕 - 降低敌人命中率
@@ -957,7 +989,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
             ).filter(i => i.quantity > 0)
           });
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           set({
             inventory: state.inventory.map(i => 
@@ -970,16 +1002,16 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
         // 军号 - 攻击力提升
         if (isInBattle) {
           const attackUpEffect = createStatusEffect('attackUp', 3, 0.5);
-          const result = addStatusEffect(state.player, attackUpEffect);
+          const { entity: buffedPlayer } = addStatusEffect(state.player, attackUpEffect);
           set({
-            player: state.player,
+            player: buffedPlayer,
             inventory: state.inventory.map(i => 
               i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
             ).filter(i => i.quantity > 0)
           });
           get().addBattleMessage(`📯 使用了${item.name}！攻击力提升50%，持续3回合！`);
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           set({
             inventory: state.inventory.map(i => 
@@ -993,17 +1025,17 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
         if (isInBattle) {
           const attackUpEffect = createStatusEffect('attackUp', 3, 0.5);
           const defenseUpEffect = createStatusEffect('defenseUp', 3, 0.3);
-          addStatusEffect(state.player, attackUpEffect);
-          const result2 = addStatusEffect(state.player, defenseUpEffect);
+          const { entity: buffedPlayer } = addStatusEffect(state.player, attackUpEffect);
+          const { entity: buffedPlayer2 } = addStatusEffect(buffedPlayer, defenseUpEffect);
           set({
-            player: state.player,
+            player: buffedPlayer2,
             inventory: state.inventory.map(i => 
               i.item.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
             ).filter(i => i.quantity > 0)
           });
           get().addBattleMessage(`📡 使用了${item.name}！攻击力提升50%，防御力提升30%，持续3回合！`);
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           set({
             inventory: state.inventory.map(i => 
@@ -1022,7 +1054,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
             ).filter(i => i.quantity > 0)
           });
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           set({
             inventory: state.inventory.map(i => 
@@ -1041,7 +1073,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
             ).filter(i => i.quantity > 0)
           });
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           set({
             inventory: state.inventory.map(i => 
@@ -1061,10 +1093,10 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       } else if (item.id === 'i11') {
         // 再生丸 - 复活并添加再生效果
         const regenEffect = createStatusEffect('regen', 5, 10);
-        addStatusEffect(state.player, regenEffect);
+        const { entity: regenedPlayer } = addStatusEffect(state.player, regenEffect);
         set({
           player: {
-            ...state.player,
+            ...regenedPlayer,
             hp: Math.floor(state.player.maxHp * 0.5)
           },
           inventory: state.inventory.map(i => 
@@ -1074,7 +1106,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
         if (isInBattle) {
           get().addBattleMessage(`💚 使用了${item.name}！HP恢复至50%，并附加再生效果，每回合恢复10HP，持续5回合！`);
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           get().addMessage(`💚 使用了${item.name}！HP恢复至50%，并附加再生效果！`);
         }
@@ -1097,7 +1129,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
           get().addBattleMessage(`使用了${item.name}！`);
           // 战斗中使用后轮到敌人
           set({ battle: { ...state.battle!, turn: 'enemy' } });
-          setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+          scheduleEnemyAttack(get, set);
         } else {
           get().addMessage(`使用了${item.name}！`);
         }
@@ -1107,7 +1139,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
 
   flee: () => {
     const state = get();
-    if (!state.battle) return;
+    if (!state.battle || state.battle.isProcessing) return;
 
     if (state.battle.enemy.isBoss) {
       get().addBattleMessage('⚠️ BOSS战无法撤退！');
@@ -1120,7 +1152,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
     } else {
       get().addBattleMessage('🏃 逃跑失败！');
       set({ battle: { ...state.battle, turn: 'enemy' } });
-      setTimeout(() => processEnemyCounterAttack(get, set), 1500);
+      scheduleEnemyAttack(get, set);
     }
   },
 
@@ -1254,13 +1286,12 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
 
   healPlayer: () => {
     const state = get();
-    if (state.gold < 50) {
+    if (state.player.gold < 50) {
       get().addMessage('治疗费用50金币，你没有足够的金币！');
       return;
     }
     set({
-      gold: state.gold - 50,
-      player: { ...state.player, hp: state.player.maxHp }
+      player: { ...state.player, gold: state.player.gold - 50, hp: state.player.maxHp }
     });
     get().addMessage('付了50金币，HP全部恢复了！');
   },
@@ -1269,13 +1300,13 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
     const state = get();
     const repairCost = state.tanks.reduce((sum, tank) => sum + (tank.maxArmor - tank.armor), 0);
     
-    if (state.gold < repairCost) {
+    if (state.player.gold < repairCost) {
       get().addMessage(`修理全部战车需要${repairCost}金币，你的金币不足！`);
       return;
     }
     
     set({
-      gold: state.gold - repairCost,
+      player: { ...state.player, gold: state.player.gold - repairCost },
       tanks: state.tanks.map(tank => ({ ...tank, armor: tank.maxArmor }))
     });
     get().addMessage(`付了${repairCost}金币，所有战车装甲已修复！`);
@@ -1416,7 +1447,6 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       player: state.player,
       members: state.members,
       inventory: state.inventory,
-      gold: state.gold,
       tanks: state.tanks,
       currentTankIndex: state.currentTankIndex,
       isOnTank: state.isOnTank,
@@ -1442,7 +1472,6 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
         player: data.player,
         members: data.members,
         inventory: data.inventory,
-        gold: data.gold,
         tanks: data.tanks,
         currentTankIndex: data.currentTankIndex,
         isOnTank: data.isOnTank,
@@ -1472,7 +1501,6 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       player: initialPlayer,
       members: [initialPlayer],
       inventory: initialInventory,
-      gold: 50,
       tanks: [],
       currentTankIndex: 0,
       isOnTank: false,
@@ -1486,6 +1514,8 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       battleLog: [],
       blueprints: [],
       warehouseItems: [],
+      dialogQueue: [],
+      activeDialog: null,
       quests: {
         available: [],
         inProgress: [],
@@ -1513,6 +1543,28 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
       set({ currentBuildingId: building.id, currentBuilding: building, gamePhase: 'building' });
       get().addMessage(`进入了${building.name}`);
     }
+
+    const state = get();
+    const currentLocationId = state.currentLocationId;
+    const locationDialogs = getDialogsByLocation(building.id);
+    const locationDialogsByCurrentLoc = dialogs.filter(d =>
+      d.locationId && currentLocationId.startsWith(d.locationId)
+    );
+    const allLocationDialogs = [...locationDialogs, ...locationDialogsByCurrentLoc].filter(
+      (d, index, self) => self.findIndex(dd => dd.id === d.id) === index
+    );
+
+    const eligibleDialogs = allLocationDialogs.filter(d => {
+      if (d.triggerCondition) {
+        return get().checkDialogCondition(d.triggerCondition);
+      }
+      return true;
+    });
+
+    if (eligibleDialogs.length > 0) {
+      const firstDialog = eligibleDialogs[0];
+      get().startDialogChain(firstDialog.id);
+    }
   },
 
   leaveBuilding: () => {
@@ -1526,13 +1578,13 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
     if (!member) return;
 
     const cost = Math.floor(member.maxHp * 2);
-    if (state.gold < cost) {
+    if (state.player.gold < cost) {
       get().addMessage(`复活${member.name}需要${cost}金币，你没有足够的金币！`);
       return;
     }
 
     set({
-      gold: state.gold - cost,
+      player: { ...state.player, gold: state.player.gold - cost },
       members: state.members.map(m => 
         m.id === memberId ? { ...m, hp: Math.floor(m.maxHp / 2) } : m
       )
@@ -1563,7 +1615,7 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
     }
 
     set({
-      gold: state.gold + bounty,
+      player: { ...state.player, gold: state.player.gold + bounty },
       storyFlags: { ...state.storyFlags, [bountyKey]: true }
     });
     get().addMessage(`🏆 领取了${bounty}金币的赏金！`);
@@ -1623,6 +1675,55 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
 
   closeCrafting: () => {
     set({ gamePhase: 'explore' });
+  },
+
+  craftItem: (blueprintId: string) => {
+    const state = get();
+    const blueprint = blueprints.find(b => b.id === blueprintId);
+    if (!blueprint) return;
+
+    const hasMaterials = blueprint.materials.every(mat => {
+      const invItem = state.inventory.find(i => i.item.id === mat.itemId);
+      return invItem && invItem.quantity >= mat.quantity;
+    });
+
+    if (!hasMaterials) {
+      get().addMessage('材料不足，无法制造！');
+      return;
+    }
+
+    const newInventory = state.inventory.map(invItem => {
+      const material = blueprint.materials.find(m => m.itemId === invItem.item.id);
+      if (material) {
+        return { ...invItem, quantity: invItem.quantity - material.quantity };
+      }
+      return invItem;
+    }).filter(invItem => invItem.quantity > 0);
+
+    const resultItem = items.find(i => i.id === blueprint.craftResult.itemId);
+    if (resultItem) {
+      const existingResult = newInventory.find(i => i.item.id === resultItem.id);
+      if (existingResult) {
+        newInventory.forEach((invItem, idx) => {
+          if (invItem.item.id === resultItem.id) {
+            newInventory[idx] = { ...invItem, quantity: invItem.quantity + blueprint.craftResult.quantity };
+          }
+        });
+      } else {
+        newInventory.push({ item: resultItem, quantity: blueprint.craftResult.quantity });
+      }
+    }
+
+    set({ inventory: newInventory });
+    get().addMessage(`成功制造了${blueprint.name}的产物！`);
+  },
+
+  setInventory: (inventory: InventoryItem[]) => {
+    set({ inventory });
+  },
+
+  setStoryFlags: (flags: StoryFlags) => {
+    set({ storyFlags: flags });
   },
 
   addQuest: (questId: string) => {
@@ -1709,26 +1810,15 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
     
     // 发放奖励
     let newPlayer = { ...state.player };
-    let newGold = state.gold;
-    let newExp = state.player.exp;
     
     if (quest.rewards) {
       if (quest.rewards.gold) {
-        newGold += quest.rewards.gold;
+        newPlayer.gold += quest.rewards.gold;
       }
       if (quest.rewards.exp) {
-        newExp += quest.rewards.exp;
-        const expNeeded = newPlayer.level * 50;
-        if (newExp >= expNeeded) {
-          newPlayer = {
-            ...newPlayer,
-            level: newPlayer.level + 1,
-            exp: newExp - expNeeded,
-            maxHp: newPlayer.maxHp + 8,
-            hp: newPlayer.maxHp + 8,
-            attack: newPlayer.attack + 1,
-            defense: newPlayer.defense + 1
-          };
+        newPlayer.exp += quest.rewards.exp;
+        while (checkLevelUp(newPlayer)) {
+          newPlayer = performLevelUp(newPlayer);
         }
       }
     }
@@ -1738,7 +1828,6 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
     
     set({
       player: newPlayer,
-      gold: newGold,
       quests: {
         ...state.quests,
         inProgress: newInProgress,
@@ -1759,5 +1848,347 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
   },
 
   triggerEffect: (type: string, position: 'enemy' | 'player') => {
+  },
+
+  startDialogChain: (dialogId: string) => {
+    const dialog = getDialogById(dialogId);
+    if (!dialog) return;
+
+    const queue: Dialog[] = [];
+    let currentId = dialog.nextDialogId;
+    while (currentId) {
+      const next = getDialogById(currentId);
+      if (!next) break;
+      queue.push(next);
+      currentId = next.nextDialogId;
+    }
+
+    set({
+      activeDialog: dialog,
+      dialogQueue: queue
+    });
+  },
+
+  nextDialog: () => {
+    const state = get();
+    if (state.dialogQueue.length === 0) {
+      set({ activeDialog: null, dialogQueue: [] });
+      return;
+    }
+
+    const [next, ...remainingQueue] = state.dialogQueue;
+
+    const condition = next.triggerCondition;
+    if (condition) {
+      const conditionMet = get().checkDialogCondition(condition);
+      if (!conditionMet) {
+        set({ dialogQueue: remainingQueue });
+        get().nextDialog();
+        return;
+      }
+    }
+
+    set({ activeDialog: next, dialogQueue: remainingQueue });
+
+    if (next.action) {
+      get().processDialogAction(next.action);
+    }
+  },
+
+  checkDialogCondition: (condition: string): boolean => {
+    const state = get();
+    switch (condition) {
+      case 'hasLeftHome':
+        return state.storyFlags.hasLeftHome === true;
+      case 'metRedWolf':
+        return state.storyFlags.metRedWolf === true;
+      case 'defeatedBattleDog':
+        return state.defeatedBosses.includes('boss0');
+      case 'hasTank':
+        return state.tanks.length > 0;
+      case 'defeatedWaterMonster':
+        return state.defeatedBosses.includes('boss1');
+      case 'visitedFactory':
+        return state.storyFlags.visitedFactory === true;
+      case 'recruitedWarrior':
+        return state.members.some(m => m.id === 'warrior' || m.role === '格斗家');
+      case 'defeatedMarshall':
+        return state.defeatedBosses.includes('boss6');
+      case 'defeatedGomez':
+        return state.defeatedBosses.includes('boss7');
+      case 'defeatedPorter':
+        return state.defeatedBosses.includes('boss10');
+      case 'defeatedNoah':
+        return state.defeatedBosses.includes('boss11');
+      default:
+        return false;
+    }
+  },
+
+  processDialogAction: (action: string) => {
+    const state = get();
+    switch (action) {
+      case 'restoreHP': {
+        set({
+          player: { ...state.player, hp: state.player.maxHp },
+          members: state.members.map(m => ({ ...m, hp: m.maxHp }))
+        });
+        get().addMessage('姐姐让你好好休息，HP完全恢复了！');
+        break;
+      }
+      case 'startBattle_battleDog': {
+        const boss = enemies.find(e => e.id === 'boss0');
+        if (boss) {
+          set({ activeDialog: null, dialogQueue: [] });
+          get().startBattle(boss);
+        }
+        break;
+      }
+      case 'startBattle_waterMonster': {
+        const boss = enemies.find(e => e.id === 'boss1');
+        if (boss) {
+          set({ activeDialog: null, dialogQueue: [] });
+          get().startBattle(boss);
+        }
+        break;
+      }
+      case 'getFirstTank': {
+        if (state.tanks.length > 0) break;
+        const mainGun = items.find(i => i.id === 'w1');
+        const newTank: Tank = {
+          id: `tank_${Date.now()}`,
+          name: '先锋号',
+          type: 'tank_placeholder',
+          attack: 15,
+          defense: 10,
+          armor: 80,
+          maxArmor: 80,
+          weapon: mainGun ? { ...mainGun } : undefined,
+          mainCannonAmmo: 16
+        };
+        set({
+          tanks: [newTank],
+          isOnTank: true,
+          tankLocation: null,
+          defeatedBosses: [...state.defeatedBosses, 'boss0'],
+          storyFlags: { ...state.storyFlags, metMysticHunter: true }
+        });
+        get().addMessage('🏆 获得了第一辆战车：先锋号！');
+        break;
+      }
+      case 'recruitMechanic': {
+        const mechanicChar = characters.find(c => c.id === 'char2');
+        if (mechanicChar && !state.members.some(m => m.role === '机械师')) {
+          const newMember: Player = {
+            id: 'mechanic',
+            name: mechanicChar.name,
+            level: 1,
+            hp: mechanicChar.baseHp,
+            maxHp: mechanicChar.baseHp,
+            attack: mechanicChar.baseAttack,
+            defense: mechanicChar.baseDefense,
+            speed: 10,
+            gold: 0,
+            exp: 0,
+            role: '机械师',
+            portraitId: mechanicChar.portraitId,
+            drivingLevel: 1,
+            drivingExp: 0,
+            statusEffects: [],
+            critRate: 0.1,
+            critDamage: 1.5,
+            dodgeRate: 0.05,
+            hitRate: 0.95
+          };
+          set({ members: [...state.members, newMember] });
+          get().addMessage('小武加入队伍！');
+        }
+        break;
+      }
+      case 'getSecondTank': {
+        const mainGun = items.find(i => i.id === 'w1');
+        const newTank: Tank = {
+          id: `tank_${Date.now()}`,
+          name: '铁壁号',
+          type: 'tank_placeholder',
+          attack: 25,
+          defense: 12,
+          armor: 100,
+          maxArmor: 100,
+          weapon: mainGun ? { ...mainGun } : undefined,
+          mainCannonAmmo: 16
+        };
+        set({ tanks: [...state.tanks, newTank] });
+        get().addMessage('🏆 获得了【铁壁号】！');
+        break;
+      }
+      case 'addExpAndGold_150_200': {
+        let newPlayer = {
+          ...state.player,
+          exp: state.player.exp + 150,
+          gold: state.player.gold + 200
+        };
+        while (checkLevelUp(newPlayer)) {
+          newPlayer = performLevelUp(newPlayer);
+        }
+        set({
+          player: newPlayer,
+          members: state.members.map(m => m.id === state.player.id ? newPlayer : m)
+        });
+        get().addMessage('获得经验值 150！\n获得金币 200！');
+        break;
+      }
+      case 'checkHPRequirement': {
+        const maxHp = Math.max(state.player.maxHp, ...state.members.map(m => m.maxHp));
+        if (maxHp > 255) {
+          const successDialog = dialogs.find(d => d.id === 'ordo_warrior_success');
+          if (successDialog) {
+            set({
+              activeDialog: successDialog,
+              dialogQueue: [...state.dialogQueue]
+            });
+          }
+        } else {
+          const failDialog = dialogs.find(d => d.id === 'ordo_warrior_fail');
+          if (failDialog) {
+            set({
+              activeDialog: failDialog,
+              dialogQueue: [...state.dialogQueue]
+            });
+          }
+        }
+        break;
+      }
+      case 'recruitWarrior': {
+        const warriorChar = characters.find(c => c.id === 'char3');
+        if (warriorChar && !state.members.some(m => m.role === '格斗家')) {
+          const newMember: Player = {
+            id: 'warrior',
+            name: warriorChar.name,
+            level: 1,
+            hp: warriorChar.baseHp,
+            maxHp: warriorChar.baseHp,
+            attack: warriorChar.baseAttack,
+            defense: warriorChar.baseDefense,
+            speed: 10,
+            gold: 0,
+            exp: 0,
+            role: '格斗家',
+            portraitId: warriorChar.portraitId,
+            drivingLevel: 1,
+            drivingExp: 0,
+            statusEffects: [],
+            critRate: 0.1,
+            critDamage: 1.5,
+            dodgeRate: 0.05,
+            hitRate: 0.95
+          };
+          set({ members: [...state.members, newMember] });
+          get().addMessage('阿雅加入队伍！');
+        }
+        break;
+      }
+      case 'rewardMarshall': {
+        const mainGun = items.find(i => i.id === 'w1');
+        const newTank: Tank = {
+          id: `tank_${Date.now()}`,
+          name: '堡垒号',
+          type: 'tank_placeholder',
+          attack: 35,
+          defense: 20,
+          armor: 150,
+          maxArmor: 150,
+          weapon: mainGun ? { ...mainGun } : undefined,
+          mainCannonAmmo: 16
+        };
+        let newPlayer = {
+          ...state.player,
+          exp: state.player.exp + 1000,
+          gold: state.player.gold + 1500
+        };
+        while (checkLevelUp(newPlayer)) {
+          newPlayer = performLevelUp(newPlayer);
+        }
+        set({
+          player: newPlayer,
+          members: state.members.map(m => m.id === state.player.id ? newPlayer : m),
+          tanks: [...state.tanks, newTank]
+        });
+        get().addMessage('获得经验值 1000！\n获得金币 1500！\n获得【堡垒号】！');
+        break;
+      }
+      case 'rewardGomez': {
+        const mainGun = items.find(i => i.id === 'w1');
+        const newTank: Tank = {
+          id: `tank_${Date.now()}`,
+          name: '赤焰号',
+          type: 'tank_placeholder',
+          attack: 50,
+          defense: 30,
+          armor: 200,
+          maxArmor: 200,
+          weapon: mainGun ? { ...mainGun } : undefined,
+          mainCannonAmmo: 16
+        };
+        let newPlayer = {
+          ...state.player,
+          exp: state.player.exp + 2000,
+          gold: state.player.gold + 3000
+        };
+        while (checkLevelUp(newPlayer)) {
+          newPlayer = performLevelUp(newPlayer);
+        }
+        set({
+          player: newPlayer,
+          members: state.members.map(m => m.id === state.player.id ? newPlayer : m),
+          tanks: [...state.tanks, newTank]
+        });
+        get().addMessage('获得经验值 2000！\n获得金币 3000！\n获得【赤焰号】！');
+        break;
+      }
+      case 'rewardPorter': {
+        let newPlayer = {
+          ...state.player,
+          exp: state.player.exp + 2500,
+          gold: state.player.gold + 4000
+        };
+        while (checkLevelUp(newPlayer)) {
+          newPlayer = performLevelUp(newPlayer);
+        }
+        set({
+          player: newPlayer,
+          members: state.members.map(m => m.id === state.player.id ? newPlayer : m)
+        });
+        get().addMessage('获得经验值 2500！\n获得金币 4000！');
+        break;
+      }
+      case 'startBattle_noah': {
+        const boss = enemies.find(e => e.id === 'boss11');
+        if (boss) {
+          set({ activeDialog: null, dialogQueue: [] });
+          get().startBattle(boss);
+        }
+        break;
+      }
+      case 'ending':
+      case 'showEnding': {
+        set({ activeDialog: null, dialogQueue: [], gamePhase: 'title' });
+        get().addMessage('🎉 恭喜通关废土战歌！感谢游玩！');
+        break;
+      }
+      case 'redWolfAppears': {
+        get().addMessage('💥 神秘猎人驾驶战车出现！');
+        set({
+          storyFlags: { ...state.storyFlags, metRedWolf: true }
+        });
+        break;
+      }
+      case 'nameTank': {
+        get().addMessage('给战车起个名字吧！');
+        break;
+      }
+      default:
+        break;
+    }
   }
 }));
