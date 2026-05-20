@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { Building } from '../types';
 import { quests as allQuests } from '../data/quests';
@@ -332,6 +332,20 @@ const BuildingScreen: React.FC = () => {
   const [hospitalDialog, setHospitalDialog] = useState(0);
   const [officeView, setOfficeView] = useState<'main' | 'list' | 'dialog'>('main');
 
+  useEffect(() => {
+    setSelectedNpc(null);
+    setNpcDialog(0);
+    setShowContent('main');
+    setHasRested(false);
+    setShowSell(false);
+    setHouseAction('none');
+    setHospitalDialog(0);
+    setOfficeView('main');
+    setShowQuestAccept(null);
+    setShowFatherDialog(false);
+    setFatherDialogStep(0);
+  }, [currentBuilding?.id]);
+
   if (!currentBuilding) return null;
 
   const building = currentBuilding;
@@ -397,7 +411,7 @@ const BuildingScreen: React.FC = () => {
     // 检查对话是否到最后，然后显示任务接取选项
     if (npcDialog === npc.dialogs.length - 1) {
       // 酒吧老板：主线任务 - 寻找战车
-      if ((building.type === 'bar' || building.id === 'radom_bar') && npc.name === '酒吧老板') {
+      if (building.id === 'radom_bar' && npc.name === '酒吧老板') {
         // 检查是否满足前置条件（完成 main_1_1 或者没有在进行中的寻找战车任务）
         const main1 = quests.inProgress.find(q => q.id === 'main_1');
         const hasMain1_1Completed = main1?.objectives.some(o => o.id === 'main_1_1' && o.completed);
@@ -411,7 +425,7 @@ const BuildingScreen: React.FC = () => {
       }
       
       // 勇士中心：主线任务 - 消灭水怪
-      if (building.type === 'office' || building.id === 'radom_office') {
+      if (building.id === 'radom_office') {
         const hasMain1 = quests.completed.some(q => q.id === 'main_1');
         const hasMain3 = quests.inProgress.some(q => q.id === 'main_3');
         const hasCompletedMain3 = quests.completed.some(q => q.id === 'main_3');
@@ -1240,8 +1254,17 @@ const BuildingScreen: React.FC = () => {
 
   const renderDialogContent = () => {
     if (selectedNpc === null) return null;
+    if (selectedNpc < 0 || selectedNpc >= npcs.length) {
+      setSelectedNpc(null);
+      setShowContent('main');
+      return null;
+    }
     const npc = npcs[selectedNpc];
-    if (!npc) return null;
+    if (!npc) {
+      setSelectedNpc(null);
+      setShowContent('main');
+      return null;
+    }
 
     // 显示任务接取界面
     if (showQuestAccept) {
