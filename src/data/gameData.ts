@@ -531,7 +531,7 @@ export const locations: Location[] = [
     enemyChance: 0.4,
     treasureChance: 0.1,
     eventChance: 0.1,
-    enemyIds: ['enemy_1', 'enemy_3', 'enemy_4']
+    enemyIds: ['enemy_1', 'enemy_3']
   },
   {
     id: 'radom_cave_1f',
@@ -546,7 +546,7 @@ export const locations: Location[] = [
     enemyChance: 0.4,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_5', 'enemy_6']
+    enemyIds: ['enemy_4', 'enemy_5']
   },
   {
     id: 'radom_cave_2f',
@@ -577,7 +577,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.15,
     eventChance: 0.1,
-    enemyIds: ['enemy_5', 'enemy_6']
+    enemyIds: ['enemy_3', 'enemy_4']
   },
   {
     id: 'water_cave',
@@ -647,7 +647,7 @@ export const locations: Location[] = [
     enemyChance: 0.4,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_3', 'enemy_5', 'enemy_6']
+    enemyIds: ['enemy_4', 'enemy_5', 'enemy_6']
   },
 
   // ============ 绿洲镇区域 ============
@@ -703,7 +703,8 @@ export const locations: Location[] = [
     parentTownId: 'bob',
     enemyChance: 0.5,
     treasureChance: 0.3,
-    eventChance: 0.2
+    eventChance: 0.2,
+    enemyIds: ['enemy_7', 'enemy_8']
   },
   {
     id: 'bridge',
@@ -789,6 +790,7 @@ export const locations: Location[] = [
     type: 'town',
     connections: [
       { locationId: 'ordo_wilderness', direction: '返回' },
+      { locationId: 'porto_wilderness', direction: '港口探索' },
       { locationId: 'porto_building', direction: '港口大楼' }
     ],
     parentTownId: 'porto',
@@ -818,6 +820,20 @@ export const locations: Location[] = [
     treasureChance: 0.3,
     eventChance: 0.2,
     bossId: 'boss5'
+  },
+  {
+    id: 'porto_wilderness',
+    name: '铁锚港周边',
+    description: '铁锚港周边的港口地区，有怪物出没。',
+    type: 'wilderness',
+    connections: [
+      { locationId: 'porto_town', direction: '返回镇内' }
+    ],
+    parentTownId: 'porto',
+    enemyChance: 0.5,
+    treasureChance: 0.2,
+    eventChance: 0.1,
+    enemyIds: ['enemy_7', 'enemy_8', 'enemy_9']
   },
 
   // ============ 铁拳镇区域 ============
@@ -861,7 +877,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_7', 'enemy_8']
+    enemyIds: ['enemy_9', 'enemy_10']
   },
   {
     id: 'hospital',
@@ -873,6 +889,7 @@ export const locations: Location[] = [
     enemyChance: 0.6,
     treasureChance: 0.3,
     eventChance: 0.2,
+    enemyIds: ['enemy_9', 'enemy_10'],
     bossId: 'boss6'
   },
 
@@ -917,7 +934,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_7', 'enemy_8']
+    enemyIds: ['enemy_9', 'enemy_10']
   },
   {
     id: 'free_building',
@@ -929,6 +946,7 @@ export const locations: Location[] = [
     enemyChance: 0.7,
     treasureChance: 0.2,
     eventChance: 0.1,
+    enemyIds: ['enemy_10'],
     bossId: 'boss7'
   },
 
@@ -969,10 +987,10 @@ export const locations: Location[] = [
       { locationId: 'yuge_village', direction: '静寂村' }
     ],
     parentTownId: 'irl',
-    enemyChance: 0.4,
+    enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_7', 'enemy_8']
+    enemyIds: ['enemy_9', 'enemy_10']
   },
 
   // ============ 静寂村区域 ============
@@ -1014,7 +1032,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_7', 'enemy_8']
+    enemyIds: ['enemy_9', 'enemy_10']
   },
 
   // ============ 日耀镇区域 ============
@@ -1057,7 +1075,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_7', 'enemy_8']
+    enemyIds: ['enemy_9', 'enemy_10']
   },
   {
     id: 'sewer',
@@ -1068,7 +1086,8 @@ export const locations: Location[] = [
     parentTownId: 'sol',
     enemyChance: 0.6,
     treasureChance: 0.3,
-    eventChance: 0.2
+    eventChance: 0.2,
+    enemyIds: ['enemy_10']
   },
 
   // ============ 伊甸镇区域 ============
@@ -1111,7 +1130,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_7', 'enemy_8']
+    enemyIds: ['enemy_9', 'enemy_10']
   },
   {
     id: 'tower',
@@ -1123,6 +1142,7 @@ export const locations: Location[] = [
     enemyChance: 0.7,
     treasureChance: 0.2,
     eventChance: 0.1,
+    enemyIds: ['enemy_10'],
     bossId: 'boss8'
   },
 
@@ -1166,7 +1186,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_7', 'enemy_8']
+    enemyIds: ['enemy_10']
   },
   {
     id: 'waterfall',
@@ -1178,6 +1198,7 @@ export const locations: Location[] = [
     enemyChance: 0.8,
     treasureChance: 0.2,
     eventChance: 0.1,
+    enemyIds: ['enemy_10'],
     bossId: 'boss9'
   },
 
@@ -1222,7 +1243,7 @@ export const locations: Location[] = [
     enemyChance: 0.5,
     treasureChance: 0.2,
     eventChance: 0.1,
-    enemyIds: ['enemy_7', 'enemy_8']
+    enemyIds: ['enemy_10']
   },
   {
     id: 'arsenal',
@@ -1233,7 +1254,9 @@ export const locations: Location[] = [
     parentTownId: 'kanal',
     enemyChance: 0.6,
     treasureChance: 0.3,
-    eventChance: 0.2
+    eventChance: 0.2,
+    enemyIds: ['enemy_10'],
+    bossId: 'boss4'
   },
   {
     id: 'kanal_building',
@@ -1245,6 +1268,7 @@ export const locations: Location[] = [
     enemyChance: 0.7,
     treasureChance: 0.2,
     eventChance: 0.1,
+    enemyIds: ['enemy_10'],
     bossId: 'boss10'
   },
 
@@ -1286,7 +1310,8 @@ export const locations: Location[] = [
     parentTownId: 'hell_gate',
     enemyChance: 0.8,
     treasureChance: 0.2,
-    eventChance: 0.1
+    eventChance: 0.1,
+    enemyIds: ['enemy_10']
   },
 
   // ============ 末日基地 ============

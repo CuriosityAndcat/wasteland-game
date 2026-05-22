@@ -1545,16 +1545,9 @@ export const useGameStore = create<GameState & GameStoreActions>((set, get) => (
     }
 
     const state = get();
-    const currentLocationId = state.currentLocationId;
     const locationDialogs = getDialogsByLocation(building.id);
-    const locationDialogsByCurrentLoc = dialogs.filter(d =>
-      d.locationId && currentLocationId.startsWith(d.locationId)
-    );
-    const allLocationDialogs = [...locationDialogs, ...locationDialogsByCurrentLoc].filter(
-      (d, index, self) => self.findIndex(dd => dd.id === d.id) === index
-    );
 
-    const eligibleDialogs = allLocationDialogs.filter(d => {
+    const eligibleDialogs = locationDialogs.filter(d => {
       if (d.triggerCondition) {
         return get().checkDialogCondition(d.triggerCondition);
       }
