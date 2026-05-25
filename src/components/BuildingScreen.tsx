@@ -4,6 +4,7 @@ import { Building } from '../types';
 import { quests as allQuests } from '../data/quests';
 import { items } from '../data/gameData';
 import Portrait from './Portrait';
+import GameIcon from './GameIcon';
 
 const barNpcs: Record<string, { name: string; dialogs: string[] }[]> = {
   radom_bar: [
@@ -1409,7 +1410,7 @@ const BuildingScreen: React.FC = () => {
       <div className={`min-h-[400px] rounded-xl border-2 ${getBuildingInteriorStyle()} p-4`}>
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">{getBuildingIcon()}</span>
+            <GameIcon id={building.type} size="sm" fallback="🏠" />
             <div>
               <h2 className="text-white font-bold text-base">{building.name}</h2>
               <p className="text-white/50 text-xs">{currentLoc?.name}</p>

@@ -4,6 +4,7 @@ import Portrait from './Portrait';
 import NameInput from './NameInput';
 import { Item } from '../types';
 import QuestPanel from './QuestPanel';
+import GameIcon from './GameIcon';
 
 type MenuTab = 'status' | 'items' | 'tank' | 'equip' | 'ride' | 'quest' | 'save';
 
@@ -685,7 +686,9 @@ const MenuScreen: React.FC = () => {
                   : 'bg-gray-900 text-gray-500 hover:text-gray-300 hover:bg-gray-850'
               }`}
             >
-              <span className="block text-base mb-0.5">{tab.icon}</span>
+              <span className="block text-base mb-0.5">
+                <GameIcon id={tab.id} size="sm" fallback={tab.icon} />
+              </span>
               {tab.label}
             </button>
           ))}

@@ -3,6 +3,8 @@ import { useGameStore } from '../store/useGameStore';
 import { enemies } from '../data/gameData';
 import { Enemy, Building } from '../types';
 import Portrait from './Portrait';
+import GameIcon from './GameIcon';
+import MessageLog from './MessageLog';
 
 const ExploreScreen: React.FC = () => {
   const { 
@@ -124,37 +126,51 @@ const ExploreScreen: React.FC = () => {
     enterBuilding(building);
   };
 
-  const getBuildingColor = (type: string): string => {
-    switch(type) {
-      case 'bar': return 'bg-amber-700 hover:bg-amber-600 border-amber-900';
-      case 'inn': return 'bg-green-700 hover:bg-green-600 border-green-900';
-      case 'shop_human': return 'bg-purple-700 hover:bg-purple-600 border-purple-900';
-      case 'shop_tank': return 'bg-blue-700 hover:bg-blue-600 border-blue-900';
-      case 'hospital': return 'bg-red-700 hover:bg-red-600 border-red-900';
-      case 'office': return 'bg-yellow-700 hover:bg-yellow-600 border-yellow-900';
-      case 'warehouse': return 'bg-gray-700 hover:bg-gray-600 border-gray-900';
-      case 'house': return 'bg-teal-700 hover:bg-teal-600 border-teal-900';
-      case 'home': return 'bg-amber-700 hover:bg-amber-600 border-amber-900';
-      default: return 'bg-gray-700 hover:bg-gray-600 border-gray-900';
-    }
-  };
-
   const isTown = currentLoc?.type === 'town';
   const isWilderness = currentLoc?.type === 'wilderness' || currentLoc?.type === 'dungeon';
 
+  // Decorative top ornament
+  const renderTopOrnament = () => (
+    <div className="flex items-center gap-2 mb-1">
+      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-600/40 to-transparent" />
+      <span className="text-yellow-600/40 text-[10px]">✦</span>
+      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-600/40 to-transparent" />
+    </div>
+  );
+
+  // Section title
+  const SectionTitle = ({ icon, label, color = 'text-yellow-400' }: { icon: string; label: string; color?: string }) => (
+    <div className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-gray-800 via-gray-750 to-transparent border-b border-gray-700/50">
+      <span className="text-xs">{icon}</span>
+      <span className={`font-bold text-xs tracking-wider ${color}`}>{label}</span>
+    </div>
+  );
+
   return (
-    <div className="space-y-2">
-      <div className="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden">
-        <div className="bg-gray-700 px-3 py-2 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-green-400">📍 {currentLoc?.name}</h2>
-          {currentLoc?.bossId && defeatedBosses.includes(currentLoc.bossId) && (
-            <span className="bg-green-600 text-white px-2 py-0.5 rounded-full text-xs">✅ BOSS已击败</span>
-          )}
-        </div>
-        <div className="p-2">
-          <p className="text-gray-300 text-xs leading-relaxed">{currentLoc?.description}</p>
+    <div className="space-y-3">
+      {renderTopOrnament()}
+      
+      {/* ===== 地点头部 - 沉浸式场景 ===== */}
+      <div className="relative bg-gradient-to-b from-gray-850 to-gray-900 border border-gray-700/60 rounded-xl overflow-hidden shadow-lg">
+        {/* 顶部氛围光 */}
+        <div className="absolute top-0 left-1/4 w-1/2 h-16 bg-yellow-500/5 rounded-full blur-2xl pointer-events-none" />
+        
+        <div className="relative px-4 py-3">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.5)]" />
+              <h2 className="text-lg font-bold text-white tracking-wide">{currentLoc?.name}</h2>
+            </div>
+            {currentLoc?.bossId && defeatedBosses.includes(currentLoc.bossId) && (
+              <span className="bg-green-600/20 text-green-400 text-[10px] font-medium px-2 py-0.5 rounded-full border border-green-500/30">
+                ✓ 已清除
+              </span>
+            )}
+          </div>
+          <p className="text-gray-400 text-xs leading-relaxed pl-4">{currentLoc?.description}</p>
         </div>
         
+        {/* 洞穴剧情 */}
         {currentLocation === 'radom_cave_2f' && tanks.length === 0 && !defeatedBosses.includes('boss0') && caveDialogStep === -1 && (
           <div className="mx-2 mb-2 p-3 bg-gray-900/50 border border-blue-700/50 rounded-lg">
             <p className="text-blue-300 text-sm mb-3">你来到了废弃矿洞的最深处，一辆废弃的战车停在那里...</p>
@@ -261,25 +277,29 @@ const ExploreScreen: React.FC = () => {
       </div>
 
       {isTown && currentLoc?.buildings && currentLoc.buildings.length > 0 && (
-        <div className="bg-gray-800 border border-purple-600 rounded-lg overflow-hidden">
-          <div className="bg-gray-700 px-3 py-1.5">
-            <h3 className="text-yellow-400 font-bold text-xs">🏠 镇上建筑</h3>
-          </div>
-          <div className="p-2">
-            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5">
+        <div className="bg-gray-850 border border-gray-700/50 rounded-xl overflow-hidden shadow-lg">
+          <SectionTitle icon="🏛️" label="镇上建筑" />
+          <div className="p-2.5">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
               {currentLoc.buildings.map(building => (
                 <button
                   key={building.id}
                   onClick={() => handleBuildingClick(building)}
                   disabled={building.type === 'shop_tank' && tanks.length === 0}
-                  className={`flex flex-col items-center p-1.5 rounded-lg border-b-2 transition-all text-white ${
+                  className={`flex flex-col items-center py-2.5 px-1 rounded-xl transition-all duration-200 ${
                     building.type === 'shop_tank' && tanks.length === 0
-                      ? 'bg-gray-600 cursor-not-allowed opacity-50 border-gray-800'
-                      : getBuildingColor(building.type)
+                      ? 'bg-gray-800/50 cursor-not-allowed opacity-40'
+                      : 'bg-gray-800/70 hover:bg-gray-700/80 border border-gray-700/40 hover:border-yellow-600/30 hover:shadow-[0_0_12px_rgba(232,184,48,0.08)] active:scale-95'
                   }`}
                 >
-                  <span className="text-lg leading-none">{building.icon}</span>
-                  <span className="font-bold text-xs mt-0.5">{building.name}</span>
+                  <div className={`w-11 h-11 rounded-lg flex items-center justify-center mb-1.5 ${
+                    building.type === 'shop_tank' && tanks.length === 0
+                      ? 'bg-gray-700/30'
+                      : 'bg-gray-750/70 border border-gray-600/30'
+                  }`}>
+                    <GameIcon id={building.type} size="sm" fallback={building.icon} />
+                  </div>
+                  <span className="font-medium text-[11px] text-gray-300 text-center leading-tight">{building.name}</span>
                 </button>
               ))}
             </div>
@@ -288,24 +308,29 @@ const ExploreScreen: React.FC = () => {
       )}
 
       {isWilderness && currentLocationEnemies.length > 0 && (
-        <div className="bg-gray-800 border border-red-600 rounded-lg overflow-hidden">
-          <div className="bg-gray-700 px-3 py-1.5">
-            <h3 className="text-yellow-400 font-bold text-xs">👾 敌人列表</h3>
-          </div>
+        <div className="bg-gray-850 border border-gray-700/50 rounded-xl overflow-hidden shadow-lg">
+          <SectionTitle icon="👾" label="出没敌人" color="text-red-400" />
           <div className="p-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {currentLocationEnemies.map(enemy => (
                 <button
                   key={enemy.id}
                   onClick={() => handleStartBattle(enemy)}
-                  className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 p-1.5 rounded-lg transition-all"
+                  className="flex items-center gap-3 bg-gray-800/70 hover:bg-gray-700/80 p-2 rounded-xl border border-gray-700/30 hover:border-red-600/30 transition-all duration-200 active:scale-[0.98]"
                 >
-                  <Portrait id={enemy.portraitId || enemy.id} size="sm" />
-                  <div className="flex-1 text-left">
-                    <div className="font-bold text-xs text-white">{enemy.name}</div>
-                    <div className="text-xs text-gray-400">HP:{enemy.hp} ATK:{enemy.attack}</div>
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-750 flex-shrink-0 border border-gray-600/30">
+                    <Portrait id={enemy.portraitId || enemy.id} size="sm" />
                   </div>
-                  <span className="text-red-400 font-bold text-xs">⚔️</span>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="font-semibold text-xs text-white truncate">{enemy.name}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-red-300">HP {enemy.hp}</span>
+                      <span className="text-[10px] text-orange-300">ATK {enemy.attack}</span>
+                    </div>
+                  </div>
+                  <div className="w-7 h-7 rounded-lg bg-red-600/20 border border-red-600/30 flex items-center justify-center flex-shrink-0">
+                    <span className="text-red-400 text-xs font-bold">⚔</span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -313,12 +338,11 @@ const ExploreScreen: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-gray-800 border border-blue-600 rounded-lg overflow-hidden">
-        <div className="bg-gray-700 px-3 py-1.5">
-          <h3 className="text-yellow-400 font-bold text-xs">🚶 行动</h3>
-        </div>
+      {/* ===== 行动面板 ===== */}
+      <div className="bg-gray-850 border border-gray-700/50 rounded-xl overflow-hidden shadow-lg">
+        <SectionTitle icon="🛤️" label="可前往" color="text-blue-400" />
         <div className="p-3">
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className="flex flex-wrap gap-2">
             {connectedLocations.map(location => {
               const locationData = locations.find(l => l.id === location.id);
               const isBossLocation = locationData?.bossId && !defeatedBosses.includes(locationData.bossId);
@@ -330,41 +354,54 @@ const ExploreScreen: React.FC = () => {
                   key={location.id}
                   onClick={() => !hasRequirement && moveToLocation(location.id)}
                   disabled={hasRequirement}
-                  className={`font-medium py-2 px-4 rounded-lg border-b-2 transition-all text-sm ${
+                  className={`flex items-center gap-2 font-medium py-2.5 px-4 rounded-xl transition-all duration-200 text-sm ${
                     hasRequirement 
-                      ? 'bg-gray-600 cursor-not-allowed opacity-50 border-gray-800 text-white'
+                      ? 'bg-gray-800/50 cursor-not-allowed opacity-40 border border-gray-700/20 text-gray-500'
                       : isBossLocation 
-                        ? 'bg-red-700 hover:bg-red-600 border-red-900 text-white' 
-                        : 'bg-blue-700 hover:bg-blue-600 border-blue-900 text-white'
+                        ? 'bg-gradient-to-b from-red-800/60 to-red-900/60 hover:from-red-700/60 hover:to-red-800/60 border border-red-700/30 hover:border-red-500/40 text-white shadow-[0_0_10px_rgba(220,38,38,0.1)]'
+                        : 'bg-gradient-to-b from-blue-800/40 to-blue-900/40 hover:from-blue-700/40 hover:to-blue-800/40 border border-blue-700/25 hover:border-blue-500/35 text-white'
                   }`}
                 >
-                  {hasRequirement && '🔒 '}
-                  {isBossLocation && !hasRequirement ? '⚔️ ' : '➡️ '}{locationData?.name}
-                  {isBossLocation && !hasRequirement && ' (BOSS)'}
-                  {hasRequirement && ' (需战车)'}
+                  {hasRequirement && (
+                    <span className="text-[10px]">🔒</span>
+                  )}
+                  {isBossLocation && !hasRequirement && (
+                    <span className="text-xs">🏴</span>
+                  )}
+                  {!hasRequirement && !isBossLocation && (
+                    <span className="text-blue-300 text-xs">→</span>
+                  )}
+                  <span>{locationData?.name}</span>
+                  {isBossLocation && !hasRequirement && (
+                    <span className="text-[10px] text-red-300 font-normal">BOSS</span>
+                  )}
+                  {hasRequirement && (
+                    <span className="text-[10px] text-orange-300 font-normal">需战车</span>
+                  )}
                 </button>
               );
             })}
             
             {canRecruitAtLocation() && (
-              <button
-                onClick={handleRecruit}
-                className="bg-yellow-700 hover:bg-yellow-600 text-white font-medium py-2 px-4 rounded-lg border-b-2 border-yellow-900 transition-all text-sm"
-              >
-                🤝 招募 {getRecruitName()}
+              <button onClick={handleRecruit}
+                className="flex items-center gap-2 bg-gradient-to-b from-yellow-700/60 to-yellow-800/60 hover:from-yellow-600/60 hover:to-yellow-700/60 border border-yellow-600/30 hover:border-yellow-500/40 text-white font-medium py-2.5 px-4 rounded-xl transition-all duration-200 text-sm">
+                <span>🤝</span>
+                <span>招募 {getRecruitName()}</span>
               </button>
             )}
             {(canGetTankAtLocation() || canGetFirstTank()) && (
-              <button
-                onClick={handleGetTank}
-                className="bg-orange-700 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg border-b-2 border-orange-900 transition-all text-sm"
-              >
-                🎖️ 获得 {getTankName()}
+              <button onClick={handleGetTank}
+                className="flex items-center gap-2 bg-gradient-to-b from-orange-700/60 to-orange-800/60 hover:from-orange-600/60 hover:to-orange-700/60 border border-orange-600/30 hover:border-orange-500/40 text-white font-medium py-2.5 px-4 rounded-xl transition-all duration-200 text-sm">
+                <span>🎖️</span>
+                <span>获得 {getTankName()}</span>
               </button>
             )}
           </div>
         </div>
       </div>
+
+      {/* ===== 消息日志 ===== */}
+      <MessageLog />
     </div>
   );
 };

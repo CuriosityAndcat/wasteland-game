@@ -7,7 +7,14 @@ export default {
     container: {
       center: true,
     },
-    extend: {},
+    extend: {
+      colors: {
+        gray: {
+          750: '#2d2d3d',
+          850: '#17171f',
+        },
+      },
+    },
   },
   plugins: [],
 };

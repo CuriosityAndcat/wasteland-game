@@ -3,83 +3,110 @@
 @tailwind utilities;
 
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  line-height: 1.5;
-  font-weight: 400;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --waste-bg: #0a0a0f;
+  --waste-surface: #14141f;
+  --waste-border: #2a2a3f;
+  --waste-accent: #e8b830;
+  --waste-glow: rgba(232, 184, 48, 0.2);
+  --waste-red: #cc3333;
+  --waste-green: #33aa55;
+  --waste-blue: #3388cc;
 }
 
-/* Battle Effects Animations */
-@keyframes effect-fade {
-  0% { opacity: 1; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.2); }
-  100% { opacity: 0; transform: scale(0.8); }
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--waste-bg);
+  color: #e0e0e0;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  overscroll-behavior: none;
+  overflow-x: hidden;
 }
 
-@keyframes slash {
-  0% { transform: translateX(-20px) translateY(20px) rotate(-45deg); opacity: 0; }
-  50% { transform: translateX(0) translateY(0) rotate(0deg); opacity: 1; }
-  100% { transform: translateX(20px) translateY(-20px) rotate(45deg); opacity: 0; }
+/* ========== GLOW ========== */
+.glow-yellow { box-shadow: 0 0 20px rgba(232,184,48,0.3), 0 0 40px rgba(232,184,48,0.1); }
+.glow-red { box-shadow: 0 0 20px rgba(204,51,51,0.3), 0 0 40px rgba(204,51,51,0.1); }
+.glow-blue { box-shadow: 0 0 20px rgba(51,136,204,0.3), 0 0 40px rgba(51,136,204,0.1); }
+.glow-text { text-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+
+/* ========== ANIMATIONS ========== */
+@keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeInUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeInScale { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+@keyframes pulse-glow { 0%,100% { opacity:0.6; } 50% { opacity:1; } }
+@keyframes shake { 0%,100% { transform:translateX(0); } 10% { transform:translateX(-6px); } 20% { transform:translateX(6px); } 30% { transform:translateX(-4px); } 40% { transform:translateX(4px); } 50% { transform:translateX(-2px); } 60% { transform:translateX(2px); } }
+@keyframes float-up { 0% { opacity:1; transform:translateY(0) scale(1); } 100% { opacity:0; transform:translateY(-50px) scale(1.2); } }
+@keyframes slide-in-left { from { opacity:0; transform:translateX(-40px); } to { opacity:1; transform:translateX(0); } }
+@keyframes slide-in-right { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
+@keyframes float-particle { 0% { transform:translateY(0); opacity:0; } 10% { opacity:0.8; } 90% { opacity:0.3; } 100% { transform:translateY(-80px); opacity:0; } }
+@keyframes glitch { 0% { transform:translate(0); } 20% { transform:translate(-2px,2px); } 40% { transform:translate(2px,-2px); } 60% { transform:translate(-1px,-1px); } 100% { transform:translate(0); } }
+@keyframes blink-caret { 50% { border-color:transparent; } }
+@keyframes border-pulse { 0%,100% { border-color:rgba(232,184,48,0.3); } 50% { border-color:rgba(232,184,48,0.7); } }
+
+/* Existing battle effects from BattleEffect.tsx */
+@keyframes effect-fade { 0% { opacity:1; transform:scale(1); } 50% { opacity:1; transform:scale(1.2); } 100% { opacity:0; transform:scale(0.8); } }
+@keyframes slash { 0% { transform:translateX(-20px) translateY(20px) rotate(-45deg); opacity:0; } 50% { transform:translateX(0) translateY(0) rotate(0deg); opacity:1; } 100% { transform:translateX(20px) translateY(-20px) rotate(45deg); opacity:0; } }
+@keyframes shoot { 0% { transform:scale(0.5); opacity:0; } 30% { transform:scale(1.2); opacity:1; } 60% { transform:scale(0.8); opacity:0.8; } 100% { transform:scale(1); opacity:0; } }
+@keyframes fire { 0%,100% { transform:scale(1) rotate(0deg); } 25% { transform:scale(1.1) rotate(-2deg); } 50% { transform:scale(0.9) rotate(2deg); } 75% { transform:scale(1.05) rotate(-1deg); } }
+@keyframes explosion { 0% { transform:scale(0.2); opacity:0; } 30% { transform:scale(1.3); opacity:1; } 70% { transform:scale(1.1); opacity:0.8; } 100% { transform:scale(0.5); opacity:0; } }
+@keyframes hit { 0% { transform:scale(0.3) rotate(0deg); opacity:0; } 30% { transform:scale(1.2) rotate(180deg); opacity:1; } 60% { transform:scale(0.9) rotate(360deg); opacity:0.8; } 100% { transform:scale(0.5) rotate(540deg); opacity:0; } }
+@keyframes miss { 0% { transform:translateY(20px); opacity:0; } 50% { transform:translateY(0); opacity:1; } 100% { transform:translateY(-20px); opacity:0; } }
+@keyframes enter-combat { 0% { filter:brightness(1); } 50% { filter:brightness(2) saturate(0); } 100% { filter:brightness(1); } }
+
+.animate-slash { animation: slash 0.5s ease-out forwards; }
+.animate-shoot { animation: shoot 0.5s ease-out forwards; }
+.animate-fire { animation: fire 0.6s ease-in-out infinite; }
+.animate-explosion { animation: explosion 0.6s ease-out forwards; }
+.animate-hit { animation: hit 0.5s ease-out forwards; }
+.animate-miss { animation: miss 0.6s ease-out forwards; }
+.animate-fadeIn { animation: fadeIn 0.4s ease-out both; }
+.animate-fadeInUp { animation: fadeInUp 0.6s ease-out both; }
+.animate-fadeInScale { animation: fadeInScale 0.3s ease-out both; }
+.animate-shake { animation: shake 0.5s ease-in-out; }
+.animate-float-up { animation: float-up 1s ease-out forwards; }
+.animate-slide-in-left { animation: slide-in-left 0.4s ease-out both; }
+.animate-slide-in-right { animation: slide-in-right 0.4s ease-out both; }
+.animate-glitch { animation: glitch 0.3s ease-in-out; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-border-pulse { animation: border-pulse 2s ease-in-out infinite; }
+.animate-enter-combat { animation: enter-combat 0.3s ease-out; }
+
+/* ========== PARTICLES ========== */
+.particle-container {
+  position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 1;
+}
+.particle {
+  position: absolute; width: 3px; height: 3px; background: rgba(232,184,48,0.6);
+  border-radius: 50%; animation: float-particle linear infinite;
+  animation-duration: var(--duration); animation-delay: var(--delay); left: var(--x);
 }
 
-@keyframes shoot {
-  0% { transform: scale(0.5); opacity: 0; }
-  30% { transform: scale(1.2); opacity: 1; }
-  60% { transform: scale(0.8); opacity: 0.8; }
-  100% { transform: scale(1); opacity: 0; }
+/* ========== TYPEWRITER ========== */
+.typewriter-cursor {
+  display: inline-block;
+  width: 2px; height: 1.2em;
+  background: #e8b830;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink-caret 0.75s step-end infinite;
 }
 
-@keyframes fire {
-  0%, 100% { transform: scale(1) rotate(0deg); }
-  25% { transform: scale(1.1) rotate(-2deg); }
-  50% { transform: scale(0.9) rotate(2deg); }
-  75% { transform: scale(1.05) rotate(-1deg); }
+/* ========== DAMAGE NUMBERS ========== */
+.damage-number {
+  position: absolute; font-size: 1.5rem; font-weight: 900;
+  color: #ff4444; text-shadow: 0 0 10px rgba(255,68,68,0.5), 0 2px 4px rgba(0,0,0,0.5);
+  pointer-events: none; z-index: 100;
+  animation: float-up 1s ease-out forwards;
 }
+.heal-number { color: #44ff44; text-shadow: 0 0 10px rgba(68,255,68,0.5); }
 
-@keyframes explosion {
-  0% { transform: scale(0.2); opacity: 0; }
-  30% { transform: scale(1.3); opacity: 1; }
-  70% { transform: scale(1.1); opacity: 0.8; }
-  100% { transform: scale(0.5); opacity: 0; }
+/* ========== UTILITY ========== */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+  animation: fadeIn 0.2s ease-out;
 }
-
-@keyframes hit {
-  0% { transform: scale(0.3) rotate(0deg); opacity: 0; }
-  30% { transform: scale(1.2) rotate(180deg); opacity: 1; }
-  60% { transform: scale(0.9) rotate(360deg); opacity: 0.8; }
-  100% { transform: scale(0.5) rotate(540deg); opacity: 0; }
-}
-
-@keyframes miss {
-  0% { transform: translateY(20px); opacity: 0; }
-  50% { transform: translateY(0); opacity: 1; }
-  100% { transform: translateY(-20px); opacity: 0; }
-}
-
-.animate-slash {
-  animation: slash 0.5s ease-out forwards;
-}
-
-.animate-shoot {
-  animation: shoot 0.5s ease-out forwards;
-}
-
-.animate-fire {
-  animation: fire 0.6s ease-in-out infinite;
-}
-
-.animate-explosion {
-  animation: explosion 0.6s ease-out forwards;
-}
-
-.animate-hit {
-  animation: hit 0.5s ease-out forwards;
-}
-
-.animate-miss {
-  animation: miss 0.6s ease-out forwards;
-}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #1a1a2e; }
+::-webkit-scrollbar-thumb { background: #4a4a6a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #6a6a8a; }

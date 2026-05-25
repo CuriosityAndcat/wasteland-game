@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>废土战歌 - 手机预览</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(180deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        .header {
+            padding: 20px;
+            text-align: center;
+            background: linear-gradient(180deg, rgba(232,184,48,0.1) 0%, transparent 100%);
+        }
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            background: linear-gradient(90deg, #e8b830, #f4d03f);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            color: #888;
+            font-size: 12px;
+        }
+        .status-card {
+            margin: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(232,184,48,0.2);
+            border-radius: 16px;
+            text-align: center;
+        }
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(74,222,128,0.1);
+            border: 1px solid rgba(74,222,128,0.3);
+            border-radius: 20px;
+            margin-bottom: 15px;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .status-text {
+            color: #4ade80;
+            font-size: 14px;
+        }
+        .server-info {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        .play-btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a1a2e;
+            background: linear-gradient(90deg, #e8b830, #f4d03f);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 0 4px 20px rgba(232,184,48,0.3);
+        }
+        .play-btn:active {
+            transform: scale(0.98);
+        }
+        .guide-section {
+            margin: 20px;
+            padding: 20px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+        }
+        .guide-title {
+            color: #e8b830;
+            font-size: 16px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .guide-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+        }
+        .step-num {
+            width: 24px;
+            height: 24px;
+            background: rgba(232,184,48,0.2);
+            color: #e8b830;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .step-content {
+            flex: 1;
+        }
+        .step-title {
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .step-desc {
+            color: #888;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .ip-display {
+            font-family: monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #e8b830;
+            font-size: 11px;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 20px;
+        }
+        .feature {
+            text-align: center;
+            padding: 15px 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 10px;
+        }
+        .feature-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        .feature-name {
+            color: #aaa;
+            font-size: 12px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #555;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">⚔️ 废土战歌</div>
+        <div class="subtitle">Wasteland Battle Song</div>
+    </div>
+
+    <div class="status-card">
+        <div class="status-indicator">
+            <div class="status-dot"></div>
+            <span class="status-text">服务器运行中</span>
+        </div>
+        <div class="server-info">本地端口: 5173</div>
+        <button class="play-btn" onclick="startGame()">🎮 开始游戏</button>
+    </div>
+
+    <div class="features">
+        <div class="feature">
+            <div class="feature-icon">🏜️</div>
+            <div class="feature-name">废土探索</div>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">⚔️</div>
+            <div class="feature-name">战斗系统</div>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">🚗</div>
+            <div class="feature-name">战车改装</div>
+        </div>
+    </div>
+
+    <div class="guide-section">
+        <div class="guide-title">
+            <span>📱</span>
+            <span>手机访问指南</span>
+        </div>
+        
+        <div class="guide-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+                <div class="step-title">确保同一网络</div>
+                <div class="step-desc">手机和电脑必须连接同一个 WiFi 网络</div>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+                <div class="step-title">获取电脑 IP</div>
+                <div class="step-desc">在电脑上运行 ipconfig，找到 IPv4 地址<br>例如: <span class="ip-display">192.168.1.100</span></div>
+            </div>
+        </div>
+
+        <div class="guide-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+                <div class="step-title">手机浏览器访问</div>
+                <div class="step-desc">在手机浏览器输入:<br><span class="ip-display">http://192.168.1.100:5173</span><br>(将 IP 替换为你电脑的 IP)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        废土战歌 v1.0 | 本地开发预览版
+    </div>
+
+    <script>
+        function startGame() {
+            // 尝试打开本地地址
+            window.location.href = 'http://localhost:5173';
+            
+            // 如果失败，显示提示
+            setTimeout(() => {
+                alert('无法直接访问 localhost\n\n请按照下方指南，使用电脑 IP 地址访问');
+            }, 500);
+        }
+    </script>
+</body>
+</html>
