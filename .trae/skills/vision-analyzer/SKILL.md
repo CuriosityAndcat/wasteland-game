@@ -63,3 +63,19 @@ python vision_tool.py --setup                   # 配置Key（仅首次）
 - API Key 已配置好，开箱即用
 - 支持 jpg/png/jpeg 格式
 - 单次分析约 2-5 秒
+
+## 📦 GitHub Token 提醒
+
+项目已关联 GitHub 仓库：`https://github.com/CuriosityAndcat/wasteland-game.git`
+
+**Token 已保存在 Windows 凭据管理器中**，通过以下命令可随时查看或重新配置：
+
+```bash
+# 查看已存储的 GitHub 凭据
+cmdkey /list | findstr github
+
+# 重新配置（如需要）
+git credential fill <<< $("protocol=https\nhost=github.com")
+```
+
+Token 信息：用户名 `CuriosityAndcat`，Token 以 `ghp_` 开头，有 repo 权限。首次上传时已通过 `git credential approve` 写入系统凭据管理器，后续 `git push` 会自动使用。
